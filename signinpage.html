@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RentWheel - Sign In</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS Reset & Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #0b0e14;
+            background-image: 
+                radial-gradient(circle at top left, #1a1e26 0%, transparent 40%),
+                radial-gradient(circle at bottom right, #1a1e26 0%, transparent 40%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Abstract background circles matching the design */
+        .bg-glow-1 {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: #1c1a16;
+            filter: blur(80px);
+            border-radius: 50%;
+            top: -100px;
+            left: 20%;
+            z-index: 1;
+        }
+
+        .bg-glow-2 {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: #1c1a16;
+            filter: blur(60px);
+            border-radius: 50%;
+            bottom: -50px;
+            left: -50px;
+            z-index: 1;
+        }
+
+        /* Header / Logo Section */
+        .logo-container {
+            text-align: center;
+            margin-bottom: 30px;
+            z-index: 2;
+        }
+
+        .logo-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .logo-icon {
+            background-color: #f5a623;
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000000;
+        }
+
+        .logo-icon svg {
+            width: 26px;
+            height: 26px;
+            fill: #000000;
+        }
+
+        .logo-text {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .logo-subtitle {
+            color: #a0aec0;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        /* Main Card Container */
+        .main-container {
+            display: flex;
+            width: 1000px;
+            height: 600px;
+            background-color: #0d0f14;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 2;
+        }
+
+        /* Left Section (Dark side) */
+        .left-panel {
+            flex: 1;
+            background-color: #080a0d;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        .left-panel h1 {
+            font-size: 36px;
+            font-weight: 700;
+            color: #f5a623;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+
+        .left-panel p {
+            color: #a0aec0;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 40px;
+            max-width: 380px;
+        }
+
+        /* Vehicle Category Grid */
+        .vehicle-options {
+            display: flex;
+            gap: 15px;
+        }
+
+        .option-box {
+            background-color: #14171c;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            width: 80px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .option-box:hover {
+            background-color: #1a1e24;
+        }
+
+        .option-icon {
+            color: #f5a623;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .option-icon svg {
+            width: 28px;
+            height: 28px;
+            fill: none;
+            stroke: #f5a623;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .option-label {
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Right Section (Light side) */
+        .right-panel {
+            flex: 1;
+            background-color: #edf0f5;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            color: #1a202c;
+        }
+
+        .right-panel h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 8px;
+        }
+
+        .right-panel p.subtitle {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 35px;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            font-size: 14px;
+            color: #1a202c;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: #f5a623;
+        }
+
+        .form-group input::placeholder {
+            color: #a0aec0;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 16px;
+            color: #718096;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: #718096;
+            stroke-width: 2;
+        }
+
+        /* Form Actions (Remember me & Forgot pass) */
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4a5568;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .remember-me input {
+            cursor: pointer;
+            accent-color: #f5a623;
+        }
+
+        .forgot-password {
+            color: #d68100;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(to right, #f5a623, #e08b00);
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-bottom: 25px;
+        }
+
+        .submit-btn:hover {
+            opacity: 0.95;
+        }
+
+        .signup-text {
+            text-align: center;
+            font-size: 14px;
+            color: #4a5568;
+        }
+
+        .signup-text a {
+            color: #d68100;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Footer */
+        .footer-text {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #718096;
+            z-index: 2;
+            text-align: center;
+        }
+
+        /* Bottom right help button */
+        .help-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: #ffffff;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            z-index: 2;
+        }
+
+        .help-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: #1a202c;
+            stroke-width: 2.5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-glow-1"></div>
+    <div class="bg-glow-2"></div>
+
+    <div class="logo-container">
+        <div class="logo-wrapper">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+                </svg>
+            </div>
+            <div class="logo-text">RentWheel</div>
+        </div>
+        <div class="logo-subtitle">Rent vehicles easily across Nepal</div>
+    </div>
+
+    <div class="main-container">
+        
+        <div class="left-panel">
+            <h1>Your Journey Starts Here</h1>
+            <p>Access thousands of premium vehicles across Nepal. Cars, bikes, trucks – all at your fingertips.</p>
+            
+            <div class="vehicle-options">
+                <div class="option-box">
+                    <div class="option-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM5 11l1.5-4.5h11L19 11H5z"/>
+                        </svg>
+                    </div>
+                    <div class="option-label">Cars</div>
+                </div>
+
+                <div class="option-box">
+                    <div class="option-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M5 15a3 3 0 100-6 3 3 0 000 6zm14 0a3 3 0 100-6 3 3 0 000 6z"/>
+                            <path d="M5 12h4l2-3h5l2 3h1m-10 0l2-5h3l2 5"/>
+                        </svg>
+                    </div>
+                    <div class="option-label">Bikes</div>
+                </div>
+
+                <div class="option-box">
+                    <div class="option-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm11.5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM15 12h-2V6h2v6zm4.5 1H15V9h2.1l2.4 3v1z"/>
+                        </svg>
+                    </div>
+                    <div class="option-label">Trucks</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <h2>Welcome Back</h2>
+            <p class="subtitle">Please enter your details to sign in</p>
+
+            <form onsubmit="event.preventDefault();">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="example@email.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="password" placeholder="Enter your password" required>
+                        <span class="password-toggle">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <label class="remember-me">
+                        <input type="checkbox">
+                        Remember me
+                    </label>
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="submit-btn">Sign In</button>
+
+                <div class="signup-text">
+                    Don't have an account? <a href="#">Sign Up</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer-text">
+        Trusted by thousands of renters and rental companies across Nepal
+    </div>
+
+    <div class="help-btn">
+        <svg viewBox="0 0 24 24">
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <circle cx="12" cy="17" r="0.5"/>
+        </svg>
+    </div>
+
+</body>
+</html>
