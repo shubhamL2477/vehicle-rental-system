@@ -3,79 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RentWheel - Sign In</title>
+    <title>RentWheel | Login</title>
+    <link rel="stylesheet" href="./src/public/css/style.css">
+    <link rel="stylesheet" href="./src/public/css/responsive.css">
 </head>
-<body style="font-family: Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 90vh; justify-content: center;">
-
-    <div style="display: flex; align-items: center; margin-bottom: 30px;">
-        <div style="background-color: #f7a80d; border-radius: 10px; padding: 10px; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-            <svg style="width: 24px; height: 24px; fill: white;" viewBox="0 0 24 24">
-                <path d="M18.92,10.01C18.68,8.83 17.65,8 16.39,8H7.61C6.35,8 5.32,8.83 5.08,10.01L3.1,19.34C2.93,20.25 3.61,21 4.5,21H19.5C20.39,21 21.07,20.25 20.9,19.34L18.92,10.01M6.5,12A1.5,1.5 0 0,1 8,13.5A1.5,1.5 0 0,1 6.5,15A1.5,1.5 0 0,1 5,13.5A1.5,1.5 0 0,1 6.5,12M17.5,12A1.5,1.5 0 0,1 19,13.5A1.5,1.5 0 0,1 17.5,15A1.5,1.5 0 0,1 16,13.5A1.5,1.5 0 0,1 17.5,12M6,17H18V19H6V17Z" />
-            </svg>
-        </div>
-        <h1 style="color: #f7a80d; font-size: 32px; font-weight: bold; margin: 0 0 0 10px;">RentWheel</h1>
-    </div>
-
-    <div style="background-color: #fff; width: 90%; max-width: 1000px; border-radius: 20px; display: flex; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;">
-        
-        <div style="background-color: #121212; color: #fff; padding: 60px 50px; width: 45%; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center;">
-            <h2 style="font-size: 36px; font-weight: bold; margin: 0 0 20px 0; color: #f7a80d;">Welcome Back!</h2>
-            <p style="font-size: 16px; color: #b0b0b0; line-height: 1.6; margin-bottom: 40px;">Sign in to continue accessing thousands of premium vehicles across Nepal. Your next journey is just a few clicks away.</p>
-            
-            <div style="display: flex; gap: 20px;">
-                <div style="background-color: #2a2a2a; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; width: 100px;">
-                    <svg style="width: 48px; height: 48px; fill: #f7a80d; margin-bottom: 10px;" viewBox="0 0 24 24">
-                        <path d="M18.92,10.01C18.68,8.83 17.65,8 16.39,8H7.61C6.35,8 5.32,8.83 5.08,10.01L3.1,19.34C2.93,20.25 3.61,21 4.5,21H19.5C20.39,21 21.07,20.25 20.9,19.34L18.92,10.01M6.5,12A1.5,1.5 0 0,1 8,13.5A1.5,1.5 0 0,1 6.5,15A1.5,1.5 0 0,1 5,13.5A1.5,1.5 0 0,1 6.5,12M17.5,12A1.5,1.5 0 0,1 19,13.5A1.5,1.5 0 0,1 17.5,15A1.5,1.5 0 0,1 16,13.5A1.5,1.5 0 0,1 17.5,12M6,17H18V19H6V17Z" />
-                    </svg>
-                    <span style="font-size: 14px; color: #fff;">Fast</span>
-                </div>
-                <div style="background-color: #2a2a2a; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; width: 100px;">
-                    <svg style="width: 48px; height: 48px; fill: #f7a80d; margin-bottom: 10px;" viewBox="0 0 24 24">
-                        <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7A3,3 0 0,1 15,10A3,3 0 0,1 12,13A3,3 0 0,1 9,10A3,3 0 0,1 12,7M12,15C14,15 18,16 18,18V19H6V18C6,16 10,15 12,15Z" />
-                    </svg>
-                    <span style="font-size: 14px; color: #fff;">Secure</span>
+<body class="auth-page">
+    <main class="auth-layout auth-layout-login">
+        <section class="auth-hero">
+            <div class="brand-lockup">
+                <div class="brand-mark">RW</div>
+                <div>
+                    <p class="brand-kicker">Vehicle Rental System</p>
+                    <h1>RentWheel</h1>
                 </div>
             </div>
-        </div>
 
-        <div style="padding: 60px 50px; width: 55%; display: flex; flex-direction: column; justify-content: center;">
-            <h2 style="font-size: 32px; font-weight: bold; margin: 0 0 10px 0;">Sign In</h2>
-            <p style="font-size: 16px; color: #666; margin-bottom: 30px;">Welcome back to RentWheel</p>
-            
-            <form>
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px;">Email</label>
-                    <input type="email" placeholder="example@email.com" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box;">
+            <div class="hero-copy">
+                <p class="eyebrow">Login Page</p>
+                <h2>Sign in with email or phone and see clear error states.</h2>
+                <p class="hero-text">This page supports login feedback, session-aware status, and a logout button that clears the current session and sends users back here.</p>
+            </div>
+
+            <div class="hero-stats">
+                <article>
+                    <strong>Credential flexibility</strong>
+                    <span>Users can log in with either email or phone.</span>
+                </article>
+                <article>
+                    <strong>Error states</strong>
+                    <span>Validation and API errors are surfaced inside the form.</span>
+                </article>
+                <article>
+                    <strong>Logout flow</strong>
+                    <span>Session is destroyed and users return to the login screen.</span>
+                </article>
+            </div>
+        </section>
+
+        <section class="auth-panel">
+            <div class="card-shell">
+                <div class="card-heading">
+                    <p class="eyebrow">Welcome Back</p>
+                    <h2>Login to RentWheel</h2>
+                    <p>Use the same email or phone number you registered with.</p>
                 </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px;">Password</label>
-                    <div style="position: relative;">
-                        <input type="password" placeholder="Enter your password" style="width: 100%; padding: 12px 40px 12px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box;">
-                        <svg style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: #666; cursor: pointer;" viewBox="0 0 24 24">
-                            <path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" />
-                        </svg>
+
+                <div id="login-feedback" class="feedback" hidden></div>
+
+                <form id="login-form" class="auth-form" novalidate>
+                    <div class="field-grid compact-grid">
+                        <label class="field">
+                            <span>Email or phone</span>
+                            <input type="text" name="credential" placeholder="you@example.com or +977 98XXXXXXXX" required>
+                            <small data-error-for="credential"></small>
+                        </label>
+
+                        <label class="field">
+                            <span>Password</span>
+                            <input type="password" name="password" placeholder="Enter your password" required>
+                            <small data-error-for="password"></small>
+                        </label>
                     </div>
-                </div>
-                
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px;">
-                    <div style="display: flex; align-items: center;">
-                        <input type="checkbox" id="remember" style="margin-right: 8px; cursor: pointer;">
-                        <label for="remember" style="font-size: 14px; color: #666; cursor: pointer;">Remember me</label>
-                    </div>
-                    <a href="#" style="color: #f7a80d; text-decoration: none; font-size: 14px; font-weight: bold;">Forgot Password?</a>
-                </div>
-                
-                <button type="submit" style="width: 100%; padding: 14px; background-color: #f7a80d; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">Sign In</button>
-            </form>
-            
-            <p style="text-align: center; font-size: 14px; color: #666; margin: 0;">Don't have an account? <a href="#" style="color: #f7a80d; text-decoration: none; font-weight: bold;">Sign Up</a></p>
-        </div>
-    </div>
 
-    <div style="margin-top: 30px; color: #999; font-size: 12px; text-align: center;">
-        Trusted by thousands of renters and rental companies across Nepal
-    </div>
+                    <button type="submit" class="primary-button">Sign in</button>
+                </form>
 
+                <section id="session-card" class="session-card" hidden>
+                    <p class="session-label">Current session</p>
+                    <h3 id="session-name">Logged in</h3>
+                    <p id="session-meta"></p>
+                    <a class="secondary-button" href="./src/api/auth/logout.php">Logout</a>
+                </section>
+
+                <div class="auth-footer">
+                    <p>Need an account? <a href="./signuppage.html">Create one here</a></p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="./src/public/js/validation.js"></script>
+    <script src="./src/public/js/main.js"></script>
 </body>
 </html>
