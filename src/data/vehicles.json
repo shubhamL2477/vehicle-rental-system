@@ -1,0 +1,34 @@
+[
+    {
+        "id": 1,
+        "name": "Toyota Yaris",
+        "type": "car",
+        "location": "Kathmandu",
+        "availability": "available",
+        "price_per_day": 4200
+    },
+    {
+        "id": 2,
+        "name": "Royal Enfield Hunter",
+        "type": "bike",
+        "location": "Pokhara",
+        "availability": "available",
+        "price_per_day": 2500
+    },
+    {
+        "id": 3,
+        "name": "Mahindra Scorpio",
+        "type": "jeep",
+        "location": "Chitwan",
+        "availability": "booked",
+        "price_per_day": 6800
+    },
+    {
+        "id": 4,
+        "name": "Hyundai Staria",
+        "type": "van",
+        "location": "Kathmandu",
+        "availability": "available",
+        "price_per_day": 7200
+    }
+]
