@@ -1,0 +1,12 @@
+/vendor/
+/.env
+
+/src/assets/uploads/documents/*
+!/src/assets/uploads/documents/.gitignore
+/src/assets/uploads/vehicles/*
+!/src/assets/uploads/vehicles/.gitignore
+
+/src/public/assets/uploads/documents/*
+!/src/public/assets/uploads/documents/.gitignore
+/src/public/assets/uploads/vehicles/*
+!/src/public/assets/uploads/vehicles/.gitignore
