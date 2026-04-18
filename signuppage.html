@@ -45,12 +45,23 @@
                 <div class="card-heading">
                     <p class="eyebrow">Create Account</p>
                     <h2>Sign up for RentWheel</h2>
-                    <p>Use the registration form below to create your account with the required details.</p>
+                    <p>All required fields are included below. Switch the registration method and the form updates automatically.</p>
                 </div>
 
                 <div id="register-feedback" class="feedback" hidden></div>
 
                 <form id="register-form" class="auth-form" novalidate>
+                    <div class="toggle-group" role="radiogroup" aria-label="Registration method">
+                        <label class="toggle-pill is-active" data-method-option>
+                            <input type="radio" name="registration_method" value="email" checked>
+                            <span>Email</span>
+                        </label>
+                        <label class="toggle-pill" data-method-option>
+                            <input type="radio" name="registration_method" value="phone">
+                            <span>Phone</span>
+                        </label>
+                    </div>
+
                     <div class="field-grid">
                         <label class="field">
                             <span>Full name</span>
@@ -58,10 +69,16 @@
                             <small data-error-for="name"></small>
                         </label>
 
-                        <label class="field">
+                        <label class="field" data-contact-field="email">
                             <span>Email address</span>
                             <input type="email" name="email" placeholder="you@example.com" required>
                             <small data-error-for="email"></small>
+                        </label>
+
+                        <label class="field is-hidden" data-contact-field="phone">
+                            <span>Phone number</span>
+                            <input type="text" name="phone" placeholder="+977 98XXXXXXXX">
+                            <small data-error-for="phone"></small>
                         </label>
 
                         <label class="field">
