@@ -1,0 +1,144 @@
+@media (max-width: 960px) {
+    .hero-grid,
+    .detail-grid,
+    .split-grid,
+    .dashboard-layout,
+    .footer-grid,
+    .professional-footer-grid,
+    .feature-grid,
+    .company-grid,
+    .metric-grid,
+    .form-grid,
+    .filter-bar,
+    .trust-layout,
+    .trust-grid,
+    .home-stat-row {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-sidebar {
+        position: static;
+    }
+
+    .hero-banner {
+        min-height: 620px;
+        border-bottom-left-radius: 28px;
+        border-bottom-right-radius: 28px;
+    }
+
+    .hero-shell {
+        min-height: 620px;
+    }
+
+    .home-stats-band {
+        margin-top: 6px;
+    }
+
+    .footer-top,
+    .footer-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-inner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .brand {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .brand-logo {
+        width: min(220px, 100%);
+    }
+}
+
+@media (max-width: 640px) {
+    .container {
+        width: min(100% - 16px, 1150px);
+    }
+
+    .main-nav,
+    .hero-actions,
+    .card-actions,
+    .action-row,
+    .terms-row,
+    .stat-row,
+    .section-heading,
+    .price-row,
+    .hero-search-strip {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .gallery-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-summary {
+        flex-direction: column;
+    }
+
+    .hero-banner {
+        min-height: 700px;
+        border-bottom-left-radius: 24px;
+        border-bottom-right-radius: 24px;
+    }
+
+    .hero-shell {
+        min-height: 700px;
+    }
+
+    .hero-copy {
+        top: 80px;
+        width: calc(100% - 30px);
+        text-align: left;
+        left: 15px;
+        transform: translateY(0);
+    }
+
+    .hero-actions-centered {
+        justify-content: stretch;
+    }
+
+    .hero-image-caption {
+        top: auto;
+        left: 14px;
+        right: 14px;
+        bottom: 132px;
+        min-width: 0;
+    }
+
+    .quick-search-button {
+        min-width: 100%;
+    }
+
+    .hero-search-strip {
+        left: 15px;
+        right: 15px;
+        bottom: 22px;
+        width: auto;
+        transform: none;
+        border-radius: 18px;
+    }
+
+    .home-stats-band {
+        margin-top: 12px;
+    }
+
+    .footer-top {
+        padding-top: 26px;
+    }
+
+    .footer-brand-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .footer-brand-logo {
+        width: min(200px, 100%);
+    }
+}
+

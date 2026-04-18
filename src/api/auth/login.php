@@ -1,46 +1,78 @@
 <?php
 
-require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/common.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    send_json(false, 'Only POST method is allowed.', array(), 405);
+if (!is_post()) {
+    redirect('login.php');
 }
 
-$data = get_request_data();
+require_csrf();
 
-$credential = isset($data['credential']) ? trim($data['credential']) : '';
-$password = isset($data['password']) ? $data['password'] : '';
+$credential = isset($_POST['credential']) ? trim($_POST['credential']) : '';
+$password = isset($_POST['password']) ? $_POST['password'] : '';
+
+remember_input(['credential' => $credential]);
 
 if ($credential === '' || $password === '') {
-    send_json(false, 'Credential and password are required.', array(), 422);
+    set_flash('Email/phone and password are required.', 'danger');
+    redirect('login.php');
 }
 
-$user = find_user_by_credential($credential);
+$user = db_one(
+    'SELECT * FROM users WHERE email = :credential OR phone = :credential LIMIT 1',
+    ['credential' => $credential]
+);
 
-if (!$user) {
-    send_json(false, 'User not found.', array(), 404);
+if (!$user || !password_verify($password, $user['password'])) {
+    set_flash('Invalid credentials. Please try again.', 'danger');
+    redirect('login.php');
 }
 
-if (!password_verify($password, $user['password'])) {
-    send_json(false, 'Password is incorrect.', array(), 401);
+if (!auth_is_verified($user)) {
+    set_flash('Please verify your email before logging in.', 'warning');
+    redirect('verify-email.php?email=' . urlencode($user['email']));
+}
+
+if ($user['status'] === 'pending') {
+    set_flash('Your account is still pending. Please complete OTP verification first.', 'warning');
+    redirect('login.php');
 }
 
 if ($user['status'] !== 'active') {
-    send_json(false, 'Account is not active. Verify OTP first.', array(
-        'status' => $user['status']
-    ), 403);
+    $message = 'Your account is not active yet.';
+
+    if ($user['role'] === 'company') {
+        $message = 'Your company account is waiting for admin approval.';
+    }
+
+    set_flash($message, 'warning');
+    redirect('login.php');
 }
 
-$_SESSION['user_id'] = (int) $user['id'];
-$_SESSION['role_id'] = (int) $user['role_id'];
+if ($user['role'] === 'company') {
+    $company = db_one('SELECT status FROM companies WHERE owner_user_id = ?', [(int) $user['id']]);
 
-send_json(true, 'Login successful.', array(
-    'session_id' => session_id(),
-    'user' => array(
-        'id' => (int) $user['id'],
-        'name' => $user['name'],
-        'email' => $user['email'],
-        'phone' => $user['phone'],
-        'status' => $user['status']
-    )
-));
+    if (!$company || $company['status'] !== 'approved') {
+        set_flash('Your company profile has not been approved yet.', 'warning');
+        redirect('login.php');
+    }
+}
+
+if ($user['role'] === 'agent') {
+    $agent = db_one(
+        'SELECT a.status AS agent_status, c.status AS company_status
+         FROM agents a
+         INNER JOIN companies c ON c.id = a.company_id
+         WHERE a.user_id = ?',
+        [(int) $user['id']]
+    );
+
+    if (!$agent || $agent['agent_status'] !== 'active' || $agent['company_status'] !== 'approved') {
+        set_flash('Your agent account is not active right now.', 'warning');
+        redirect('login.php');
+    }
+}
+
+login_user($user);
+set_flash('Welcome back, ' . $user['name'] . '!', 'success');
+redirect('dashboard.php');

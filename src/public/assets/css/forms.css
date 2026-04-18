@@ -1,0 +1,166 @@
+/* Form styles kept simple for inputs, labels, and alerts */
+label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 15px;
+}
+
+input,
+select,
+textarea,
+button {
+    font: inherit;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: snow;
+    color: var(--text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid lightblue;
+    border-color: cornflowerblue;
+}
+
+.form-stack,
+.compact-form {
+    display: grid;
+    gap: 14px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.checkbox-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.checkbox-row input {
+    width: auto;
+}
+
+.company-fields.is-hidden {
+    display: none;
+}
+
+.filter-bar {
+    display: grid;
+    grid-template-columns: 2fr repeat(3, 1fr) auto;
+    gap: 12px;
+    margin-bottom: 20px;
+    align-items: end;
+}
+
+.alert {
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+}
+
+.alert-info {
+    background: aliceblue;
+    border-color: lightblue;
+}
+
+.alert-success {
+    background: #edf9f1;
+    border-color: #cde8d6;
+}
+
+.alert-warning {
+    background: cornsilk;
+    border-color: #ecd7a9;
+}
+
+.alert-danger {
+    background: mistyrose;
+    border-color: #f0cdca;
+}
+
+.auth-links {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.flash-stack,
+.setup-alert {
+    margin-top: 14px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.badge-success {
+    background: #ecf9f0;
+    color: var(--success);
+}
+
+.badge-warning {
+    background: cornsilk;
+    color: var(--warning);
+}
+
+.badge-danger {
+    background: mistyrose;
+    color: var(--danger);
+}
+
+.badge-neutral {
+    background: #eef3fa;
+    color: var(--muted);
+}
+
+.empty-state {
+    text-align: center;
+}
+
+.soft {
+    background: #f7fbff;
+    box-shadow: none;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.dashboard-table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+}
+

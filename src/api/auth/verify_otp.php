@@ -1,51 +1,64 @@
 <?php
 
-require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/common.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    send_json(false, 'Only POST method is allowed.', array(), 405);
+if (!is_post()) {
+    redirect('verify-email.php');
 }
 
-$data = get_request_data();
+require_csrf();
 
-$credential = isset($data['credential']) ? trim($data['credential']) : '';
-$otp_code = isset($data['otp_code']) ? trim($data['otp_code']) : '';
+$email = isset($_POST['email']) ? trim($_POST['email']) : '';
+$otpCode = isset($_POST['otp_code']) ? trim($_POST['otp_code']) : '';
+remember_input(['email' => $email]);
 
-if ($credential === '' || $otp_code === '') {
-    send_json(false, 'Credential and OTP are required.', array(), 422);
+if ($email === '' || $otpCode === '') {
+    set_flash('Email and OTP are required.', 'danger');
+    redirect('verify-email.php');
 }
 
-$user = find_user_by_credential($credential);
+$user = auth_find_user_by_email($email);
 
 if (!$user) {
-    send_json(false, 'User not found.', array(), 404);
+    set_flash('Account not found for this email.', 'danger');
+    redirect('verify-email.php');
 }
 
-$pdo = get_db();
-$stmt = $pdo->prepare(
-    'SELECT * FROM otp_codes
-     WHERE user_id = ? AND otp_code = ? AND is_used = 0
-     ORDER BY id DESC
-     LIMIT 1'
-);
-$stmt->execute(array($user['id'], $otp_code));
-$otp = $stmt->fetch();
+if (auth_is_verified($user)) {
+    set_flash('Your email is already verified. Please log in.', 'success');
+    redirect('login.php');
+}
+
+$otp = find_valid_otp((int) $user['id'], $otpCode, 'account_verification');
 
 if (!$otp) {
-    send_json(false, 'Invalid OTP.', array(), 422);
+    set_flash('Invalid or expired OTP. Please try again or resend OTP.', 'danger');
+    redirect('verify-email.php?email=' . urlencode($email));
 }
 
-if (strtotime($otp['otp_expires_at']) < time()) {
-    send_json(false, 'OTP expired.', array(), 422);
+$pdo = require_db();
+
+try {
+    $pdo->beginTransaction();
+
+    // Mark the OTP as used and make the account active.
+    mark_otp_used((int) $otp['id']);
+    auth_mark_user_verified((int) $user['id']);
+
+    $pdo->commit();
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    set_flash('OTP verification failed. Please try again.', 'danger');
+    redirect('verify-email.php?email=' . urlencode($email));
 }
 
-$update_user = $pdo->prepare('UPDATE users SET status = ? WHERE id = ?');
-$update_user->execute(array('active', $user['id']));
+if ($user['role'] === 'company') {
+    set_flash('Email verified. Your company account now waits for admin approval.', 'success');
+} else {
+    set_flash('Email verified. You can now log in.', 'success');
+}
 
-$update_otp = $pdo->prepare('UPDATE otp_codes SET is_used = 1 WHERE id = ?');
-$update_otp->execute(array($otp['id']));
-
-send_json(true, 'OTP verified. Account is now active.', array(
-    'user_id' => (int) $user['id'],
-    'status' => 'active'
-));
+redirect('login.php');
