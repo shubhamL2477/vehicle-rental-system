@@ -1,0 +1,42 @@
+@media (max-width: 980px) {
+    .auth-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-hero,
+    .auth-panel {
+        padding: 28px;
+    }
+
+    .hero-copy h2 {
+        max-width: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .auth-page {
+        padding: 14px;
+    }
+
+    .auth-layout {
+        min-height: auto;
+    }
+
+    .auth-hero,
+    .auth-panel,
+    .card-shell {
+        padding: 22px;
+    }
+
+    .field-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .brand-lockup {
+        align-items: flex-start;
+    }
+
+    .hero-stats {
+        margin-top: 26px;
+    }
+}
