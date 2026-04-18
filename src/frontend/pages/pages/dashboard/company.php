@@ -199,7 +199,7 @@
                     <p><?= e(format_money((float) $vehicle['price_per_day'])) ?>/day</p>
                     <div class="action-row">
                         <a class="button button-small button-secondary" href="<?= e(url('dashboard.php?section=vehicles&edit_vehicle=' . $vehicle['id'])) ?>">Edit</a>
-                        <form action="<?= e(url('actions/vehicle_delete.php')) ?>" method="post">
+                        <form action="<?= e(url('actions/vehicle_delete.php')) ?>" method="post" onsubmit="return confirm('Are you sure you want to delete this vehicle?');">
                             <?= csrf_field() ?>
                             <input type="hidden" name="vehicle_id" value="<?= e((string) $vehicle['id']) ?>">
                             <button type="submit" class="button button-small button-danger">Delete</button>
