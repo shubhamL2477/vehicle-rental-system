@@ -172,11 +172,7 @@ class MaintenanceModel
         }
 
         if (in_array($user['role_name'], ['company', 'agent'], true)) {
-            $allowedCompanyId = require_company_resource_access($user, (int) $record['company_id']);
-
-            if ($allowedCompanyId < 1) {
-                throw new RuntimeException('You cannot manage maintenance outside your company.');
-            }
+            api_require_company_access($user, (int) $record['company_id']);
         }
 
         if (!empty($record['availability_block_id'])) {
