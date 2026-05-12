@@ -74,12 +74,8 @@ function api_company_id_for_user($user, $requestedCompanyId = 0)
         return (int) $requestedCompanyId;
     }
 
-    if ($user['role_name'] === 'company') {
-        return (int) $user['id'];
-    }
-
-    if ($user['role_name'] === 'agent') {
-        return (int) ($user['company_id'] ?? 0);
+    if (in_array($user['role_name'], ['company', 'agent'], true)) {
+        return managed_company_id($user);
     }
 
     return 0;

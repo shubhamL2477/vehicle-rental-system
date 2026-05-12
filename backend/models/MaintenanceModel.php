@@ -27,10 +27,10 @@ class MaintenanceModel
             throw new InvalidArgumentException('Maintenance title is required.');
         }
 
-        $startTimestamp = strtotime($startInput);
-        $endTimestamp = strtotime($endInput);
+        $start = self::normalizeDateInput($startInput, 'start_date', false);
+        $end = self::normalizeDateInput($endInput, 'end_date', true);
 
-        if ($startTimestamp === false || $endTimestamp === false || $endTimestamp < $startTimestamp) {
+        if ($end['timestamp'] < $start['timestamp']) {
             throw new InvalidArgumentException('Maintenance dates are invalid.');
         }
 
@@ -44,11 +44,42 @@ class MaintenanceModel
             'title' => $title,
             'description' => $description,
             'cost' => max(0, $cost),
-            'start_datetime' => date('Y-m-d H:i:s', $startTimestamp),
-            'end_datetime' => date('Y-m-d H:i:s', $endTimestamp),
-            'start_date' => date('Y-m-d', $startTimestamp),
-            'end_date' => date('Y-m-d', $endTimestamp),
+            'start_datetime' => $start['datetime'],
+            'end_datetime' => $end['datetime'],
+            'start_date' => $start['date'],
+            'end_date' => $end['date'],
             'status' => $status,
+        ];
+    }
+
+    private static function normalizeDateInput($value, $fieldName, $useEndOfDay)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            throw new InvalidArgumentException($fieldName . ' is required.');
+        }
+
+        $timestamp = strtotime($value);
+
+        if ($timestamp === false) {
+            throw new InvalidArgumentException($fieldName . ' must be a valid date.');
+        }
+
+        $date = date('Y-m-d', $timestamp);
+        $hasExplicitTime = preg_match('/\b\d{1,2}:\d{2}(:\d{2})?\b/', $value) === 1;
+
+        if (!$hasExplicitTime) {
+            $datetime = $useEndOfDay ? booking_end_datetime($date) : booking_start_datetime($date);
+            $timestamp = strtotime($datetime);
+        } else {
+            $datetime = date('Y-m-d H:i:s', $timestamp);
+        }
+
+        return [
+            'date' => $date,
+            'datetime' => $datetime,
+            'timestamp' => $timestamp,
         ];
     }
 
@@ -62,9 +93,9 @@ class MaintenanceModel
         }
 
         if (in_array($user['role_name'], ['company', 'agent'], true)) {
-            $companyId = $user['role_name'] === 'company' ? (int) $user['id'] : (int) $user['company_id'];
+            $companyId = managed_company_id($user);
 
-            if ((int) $vehicle['company_id'] !== $companyId) {
+            if ($companyId < 1 || (int) $vehicle['company_id'] !== $companyId) {
                 throw new RuntimeException('You cannot manage maintenance outside your company.');
             }
         }
@@ -206,9 +237,17 @@ class MaintenanceModel
         if ($blockId > 0) {
             db_run(
                 'UPDATE availability_blocks
-                 SET start_datetime = ?, end_datetime = ?, reason = ?
+                 SET vehicle_id = ?, company_id = ?, start_datetime = ?, end_datetime = ?, reason = ?, created_by_user_id = ?
                  WHERE id = ?',
-                [$payload['start_datetime'], $payload['end_datetime'], 'Maintenance: ' . $payload['title'], $blockId]
+                [
+                    $payload['vehicle_id'],
+                    (int) $vehicle['company_id'],
+                    $payload['start_datetime'],
+                    $payload['end_datetime'],
+                    'Maintenance: ' . $payload['title'],
+                    (int) $user['id'],
+                    $blockId,
+                ]
             );
 
             return $blockId;

@@ -123,10 +123,36 @@ function managed_company_id($user)
     }
 
     if ($user['role_name'] === 'company') {
+        try {
+            $companyId = db_value(
+                'SELECT id FROM companies WHERE owner_user_id = ? AND status = "approved" LIMIT 1',
+                [(int) $user['id']]
+            );
+
+            if ($companyId) {
+                return (int) $companyId;
+            }
+        } catch (Throwable $throwable) {
+            // Older local schemas stored company scope directly on users.
+        }
+
         return (int) $user['id'];
     }
 
     if ($user['role_name'] === 'agent') {
+        try {
+            $companyId = db_value(
+                'SELECT company_id FROM agents WHERE user_id = ? AND status = "active" LIMIT 1',
+                [(int) $user['id']]
+            );
+
+            if ($companyId) {
+                return (int) $companyId;
+            }
+        } catch (Throwable $throwable) {
+            // Older local schemas stored agent scope directly on users.
+        }
+
         return (int) ($user['company_id'] ?? 0);
     }
 
