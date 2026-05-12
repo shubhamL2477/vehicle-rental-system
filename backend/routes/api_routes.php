@@ -7,6 +7,7 @@
 
 return [
     'POST /api/bookings' => 'api/bookings/index.php',
+    'POST /api/reviews' => 'api/reviews/index.php',
     'GET /api/vehicles/booked_dates' => 'api/vehicles/booked_dates.php',
     'POST /api/maintenance' => 'api/maintenance/index.php',
     'POST /webhooks/stripe' => 'webhooks/stripe.php',
