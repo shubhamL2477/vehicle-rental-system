@@ -1,7 +1,7 @@
 USE vehicle_rental;
 
 ALTER TABLE bookings
-    MODIFY status ENUM('pending', 'approved', 'rejected', 'cancelled') NOT NULL DEFAULT 'pending';
+    MODIFY status ENUM('pending', 'confirmed', 'approved', 'completed', 'rejected', 'cancelled') NOT NULL DEFAULT 'pending';
 
 INSERT INTO vehicle_categories (id, name) VALUES
 (1, 'Bike'),

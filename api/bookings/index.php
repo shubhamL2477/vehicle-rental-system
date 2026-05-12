@@ -41,8 +41,12 @@ try {
         $statusCode = 422;
     }
 
-    if (preg_match('/booking|maintenance|blocked|available/i', $throwable->getMessage())) {
+    if ($throwable instanceof RuntimeException && preg_match('/booking|maintenance|blocked|available|active|price/i', $throwable->getMessage())) {
         $statusCode = 409;
+    }
+
+    if ($statusCode === 500) {
+        db_log_error($throwable, 'api/bookings/index.php');
     }
 
     api_response(false, 'Unable to create booking: ' . $throwable->getMessage(), [], $statusCode);

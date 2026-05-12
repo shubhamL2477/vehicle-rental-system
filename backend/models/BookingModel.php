@@ -14,21 +14,25 @@ class BookingModel
         $vehicleId = (int) ($data['vehicle_id'] ?? 0);
         $startInput = trim((string) ($data['start_datetime'] ?? $data['start_date'] ?? ''));
         $endInput = trim((string) ($data['end_datetime'] ?? $data['end_date'] ?? ''));
-        $withDriver = !empty($data['with_driver']);
-        $paymentMethod = trim((string) ($data['payment_method'] ?? 'cash'));
+        $withDriver = self::booleanInput($data['with_driver'] ?? false);
+        $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? 'cash')));
         $pickupLocation = trim((string) ($data['pickup_location'] ?? ''));
         $destination = trim((string) ($data['destination'] ?? ''));
-        $termsAccepted = array_key_exists('terms_accepted', $data) ? !empty($data['terms_accepted']) : true;
+        $termsAccepted = array_key_exists('terms_accepted', $data) ? self::booleanInput($data['terms_accepted']) : true;
 
         if ($vehicleId < 1) {
             throw new InvalidArgumentException('vehicle_id is required.');
         }
 
-        $startTimestamp = strtotime($startInput);
-        $endTimestamp = strtotime($endInput);
+        $start = self::normalizeDateInput($startInput, 'start_date', false);
+        $end = self::normalizeDateInput($endInput, 'end_date', true);
 
-        if ($startTimestamp === false || $endTimestamp === false || $endTimestamp < $startTimestamp) {
-            throw new InvalidArgumentException('Start and end dates are required, and end date must be after start date.');
+        if ($end['timestamp'] < $start['timestamp']) {
+            throw new InvalidArgumentException('End date must be after start date.');
+        }
+
+        if ($start['timestamp'] < strtotime(date('Y-m-d 00:00:00'))) {
+            throw new InvalidArgumentException('start_date cannot be in the past.');
         }
 
         if (!$termsAccepted) {
@@ -41,16 +45,62 @@ class BookingModel
 
         return [
             'vehicle_id' => $vehicleId,
-            'start_date' => date('Y-m-d', $startTimestamp),
-            'end_date' => date('Y-m-d', $endTimestamp),
-            'start_datetime' => date('Y-m-d H:i:s', $startTimestamp),
-            'end_datetime' => date('Y-m-d H:i:s', $endTimestamp),
+            'start_date' => $start['date'],
+            'end_date' => $end['date'],
+            'start_datetime' => $start['datetime'],
+            'end_datetime' => $end['datetime'],
             'with_driver' => $withDriver,
             'payment_method' => $paymentMethod,
             'pickup_location' => $pickupLocation,
             'destination' => $destination,
             'terms_accepted' => $termsAccepted,
         ];
+    }
+
+    private static function normalizeDateInput($value, $fieldName, $useEndOfDay)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            throw new InvalidArgumentException($fieldName . ' is required.');
+        }
+
+        $timestamp = strtotime($value);
+
+        if ($timestamp === false) {
+            throw new InvalidArgumentException($fieldName . ' must be a valid date.');
+        }
+
+        $date = date('Y-m-d', $timestamp);
+        $hasExplicitTime = preg_match('/\b\d{1,2}:\d{2}(:\d{2})?\b/', $value) === 1;
+
+        if (!$hasExplicitTime) {
+            $datetime = $useEndOfDay ? booking_end_datetime($date) : booking_start_datetime($date);
+            $timestamp = strtotime($datetime);
+        } else {
+            $datetime = date('Y-m-d H:i:s', $timestamp);
+        }
+
+        return [
+            'date' => $date,
+            'datetime' => $datetime,
+            'timestamp' => $timestamp,
+        ];
+    }
+
+    private static function booleanInput($value)
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (int) $value === 1;
+        }
+
+        $value = strtolower(trim((string) $value));
+
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
     }
 
     public static function createForUser($user, $data)
@@ -165,6 +215,20 @@ class BookingModel
         );
 
         if ($maintenance) {
+            return 'maintenance';
+        }
+
+        $maintenanceRecord = db_one(
+            'SELECT id FROM maintenance_records
+             WHERE vehicle_id = ?
+               AND status IN ("scheduled", "in_progress")
+               AND ? <= DATE(end_datetime)
+               AND ? >= DATE(start_datetime)
+             LIMIT 1',
+            [(int) $vehicleId, $startDate, $endDate]
+        );
+
+        if ($maintenanceRecord) {
             return 'maintenance';
         }
 
