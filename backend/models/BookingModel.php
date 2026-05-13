@@ -79,10 +79,22 @@ class BookingModel
                 throw new RuntimeException('The vehicle company is not active.');
             }
 
-            $conflict = self::availabilityConflict(
+            $bookingConflict = self::bookingConflict(
                 $payload['vehicle_id'],
                 $payload['start_date'],
                 $payload['end_date']
+            );
+
+            if ($bookingConflict) {
+                throw new RuntimeException(self::bookingConflictMessage($bookingConflict));
+            }
+
+            $conflict = self::availabilityConflict(
+                $payload['vehicle_id'],
+                $payload['start_date'],
+                $payload['end_date'],
+                0,
+                false
             );
 
             if ($conflict !== '') {
@@ -138,20 +150,25 @@ class BookingModel
         }
     }
 
-    public static function availabilityConflict($vehicleId, $startDate, $endDate, $excludeBookingId = 0)
+    public static function bookingConflict($vehicleId, $startDate, $endDate, $excludeBookingId = 0)
     {
-        $booking = db_one(
-            'SELECT id FROM bookings
+        return db_one(
+            'SELECT id, start_date, end_date, status
+             FROM bookings
              WHERE vehicle_id = ?
                AND id <> ?
                AND status IN ("pending", "approved", "confirmed")
                AND ? <= end_date
                AND ? >= start_date
+             ORDER BY start_date ASC
              LIMIT 1',
             [(int) $vehicleId, (int) $excludeBookingId, $startDate, $endDate]
         );
+    }
 
-        if ($booking) {
+    public static function availabilityConflict($vehicleId, $startDate, $endDate, $excludeBookingId = 0, $includeBookings = true)
+    {
+        if ($includeBookings && self::bookingConflict($vehicleId, $startDate, $endDate, $excludeBookingId)) {
             return 'booking';
         }
 
@@ -182,6 +199,23 @@ class BookingModel
         }
 
         return '';
+    }
+
+    public static function bookingConflictMessage($booking)
+    {
+        $status = trim(str_replace('_', ' ', (string) ($booking['status'] ?? '')));
+        $startDate = (string) ($booking['start_date'] ?? '');
+        $endDate = (string) ($booking['end_date'] ?? '');
+
+        if ($status === '') {
+            $status = 'existing';
+        }
+
+        if ($startDate !== '' && $endDate !== '') {
+            return 'Vehicle is unavailable for selected dates. Existing ' . $status . ' booking covers ' . $startDate . ' to ' . $endDate . '.';
+        }
+
+        return 'Vehicle already has a booking for selected dates.';
     }
 
     public static function conflictMessage($conflict)
