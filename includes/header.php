@@ -3,7 +3,8 @@ require_once __DIR__ . '/../backend/models/NotificationService.php';
 $pageTitle = $pageTitle ?? APP_NAME;
 $me = current_user();
 $msg = get_flash();
-$unreadNotifications = $me ? NotificationService::unreadCount((int) $me['id']) : 0;
+$showDashboardNotifications = $me && ($me['role_name'] ?? '') === 'user';
+$unreadNotifications = $showDashboardNotifications ? NotificationService::unreadCount((int) $me['id']) : 0;
 ?>
 <!doctype html>
 <html lang="en">
@@ -25,12 +26,14 @@ $unreadNotifications = $me ? NotificationService::unreadCount((int) $me['id']) :
         <a href="vehicles.php">Vehicles</a>
         <?php if ($me): ?>
             <a href="dashboard.php">Dashboard</a>
-            <a class="notification-bell" href="dashboard.php?section=notifications" aria-label="Notifications">
-                Notifications
-                <?php if ($unreadNotifications > 0): ?>
-                    <span><?= e($unreadNotifications) ?></span>
-                <?php endif; ?>
-            </a>
+            <?php if ($showDashboardNotifications): ?>
+                <a class="notification-bell" href="dashboard.php?section=notifications" aria-label="Notifications">
+                    Notifications
+                    <?php if ($unreadNotifications > 0): ?>
+                        <span><?= e($unreadNotifications) ?></span>
+                    <?php endif; ?>
+                </a>
+            <?php endif; ?>
             <a href="payments.php">Payments</a>
             <a href="logout.php">Logout</a>
         <?php else: ?>

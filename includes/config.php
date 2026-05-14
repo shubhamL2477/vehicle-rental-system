@@ -16,7 +16,7 @@ function env_value($key, $default = '')
 define('APP_NAME', 'Hyrox Rental');
 define('APP_TAGLINE', 'Reserve verified vehicles across trusted companies.');
 define('APP_ROOT', dirname(__DIR__));
-define('APP_PUBLIC_URL', rtrim(env_value('APP_PUBLIC_URL', 'http://localhost/vehicle-rental-system'), '/'));
+define('APP_PUBLIC_URL', rtrim(env_value('APP_PUBLIC_URL', 'http://localhost/vehicle-rental-system-clean'), '/'));
 
 define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'vehicle_rental');

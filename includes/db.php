@@ -9,13 +9,24 @@ function db()
         return $pdo;
     }
 
-    $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
+    $ports = ['3306', '3307', '3308'];
+    $lastException = null;
 
-    return $pdo;
+    foreach ($ports as $port) {
+        try {
+            $dsn = 'mysql:host=' . DB_HOST . ';port=' . $port . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]);
+
+            return $pdo;
+        } catch (PDOException $exception) {
+            $lastException = $exception;
+        }
+    }
+
+    throw $lastException ?: new PDOException('Database connection failed.');
 }
 
 function db_all($sql, $params = [])
