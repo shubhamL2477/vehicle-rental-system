@@ -60,6 +60,26 @@ require __DIR__ . '/includes/header.php';
 <section class="grid two">
     <div class="box">
         <h2>Book this vehicle</h2>
+        <div class="availability-calendar" data-availability-calendar data-vehicle-id="<?= e($vehicle['id']) ?>">
+            <div class="calendar-head">
+                <div>
+                    <h3>Availability calendar</h3>
+                    <p class="muted">Booked and maintenance dates are marked unavailable using the live booked dates API.</p>
+                </div>
+                <div class="calendar-nav">
+                    <button class="btn light small" type="button" data-calendar-prev>&larr; Previous</button>
+                    <button class="btn light small" type="button" data-calendar-next>Next &rarr;</button>
+                </div>
+            </div>
+            <div class="calendar-legend">
+                <span><i class="legend-dot available"></i> Available</span>
+                <span><i class="legend-dot booked"></i> Booked</span>
+                <span><i class="legend-dot maintenance"></i> Maintenance / blocked</span>
+                <span><i class="legend-dot selected"></i> Selected dates</span>
+            </div>
+            <p class="muted calendar-summary" data-calendar-summary>Loading availability calendar...</p>
+            <div class="calendar-months" data-calendar-months></div>
+        </div>
         <?php if (!$me): ?>
             <p>Please login as user to book this vehicle.</p>
             <a class="btn" href="login.php">Login</a>

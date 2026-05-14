@@ -39,18 +39,27 @@ if (registerForm) {
 }
 
 var bookingForm = document.querySelector('[data-booking-form]');
-if (bookingForm) {
-    var driverCheck = bookingForm.querySelector('[data-driver-check]');
-    var documentBox = bookingForm.querySelector('[data-document-box]');
-    var docFile = bookingForm.querySelector('[data-doc-file]');
-    var licenseFile = bookingForm.querySelector('[data-license-file]');
-    var bookingStart = bookingForm.querySelector('input[name="start_date"]');
-    var bookingEnd = bookingForm.querySelector('input[name="end_date"]');
-    var bookingError = bookingForm.querySelector('[data-booking-error]');
-    var availabilityStatus = bookingForm.querySelector('[data-availability-status]');
-    var bookingTotal = bookingForm.querySelector('[data-booking-total]');
-    var submitButton = bookingForm.querySelector('button[type="submit"]');
+var availabilityCalendar = document.querySelector('[data-availability-calendar]');
+if (bookingForm || availabilityCalendar) {
+    var driverCheck = bookingForm ? bookingForm.querySelector('[data-driver-check]') : null;
+    var documentBox = bookingForm ? bookingForm.querySelector('[data-document-box]') : null;
+    var docFile = bookingForm ? bookingForm.querySelector('[data-doc-file]') : null;
+    var licenseFile = bookingForm ? bookingForm.querySelector('[data-license-file]') : null;
+    var bookingStart = bookingForm ? bookingForm.querySelector('input[name="start_date"]') : null;
+    var bookingEnd = bookingForm ? bookingForm.querySelector('input[name="end_date"]') : null;
+    var bookingError = bookingForm ? bookingForm.querySelector('[data-booking-error]') : null;
+    var availabilityStatus = bookingForm ? bookingForm.querySelector('[data-availability-status]') : null;
+    var bookingTotal = bookingForm ? bookingForm.querySelector('[data-booking-total]') : null;
+    var submitButton = bookingForm ? bookingForm.querySelector('button[type="submit"]') : null;
+    var calendarSummary = availabilityCalendar ? availabilityCalendar.querySelector('[data-calendar-summary]') : null;
+    var calendarMonths = availabilityCalendar ? availabilityCalendar.querySelector('[data-calendar-months]') : null;
+    var calendarPrev = availabilityCalendar ? availabilityCalendar.querySelector('[data-calendar-prev]') : null;
+    var calendarNext = availabilityCalendar ? availabilityCalendar.querySelector('[data-calendar-next]') : null;
+    var vehicleId = bookingForm ? bookingForm.getAttribute('data-vehicle-id') : availabilityCalendar.getAttribute('data-vehicle-id');
     var blockedRanges = [];
+    var blockedDatesByDay = {};
+    var calendarMonthOffset = 0;
+    var calendarVisibleMonths = 2;
 
     function updateDocumentFields() {
         if (!driverCheck || !documentBox) {
@@ -82,6 +91,93 @@ if (bookingForm) {
         availabilityStatus.className = 'availability-status ' + (type || '');
     }
 
+    function setCalendarSummary(message) {
+        if (!calendarSummary) {
+            return;
+        }
+
+        calendarSummary.textContent = message;
+    }
+
+    function createLocalDate(dateString) {
+        var parts = String(dateString || '').split('-');
+        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+
+    function formatDateKey(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    }
+
+    function addDays(dateString, days) {
+        var date = createLocalDate(dateString);
+        date.setDate(date.getDate() + days);
+        return formatDateKey(date);
+    }
+
+    function sourcePriority(source) {
+        if (source === 'maintenance') {
+            return 3;
+        }
+
+        if (source === 'availability_block') {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    function sourceLabel(source) {
+        if (source === 'maintenance') {
+            return 'Maintenance';
+        }
+
+        if (source === 'availability_block') {
+            return 'Blocked';
+        }
+
+        return 'Booked';
+    }
+
+    function rangeLabel(range) {
+        var label = sourceLabel(range.source);
+        var reason = String(range.reason || '').trim();
+        return reason ? label + ': ' + reason : label;
+    }
+
+    function cacheBlockedDates() {
+        blockedDatesByDay = {};
+
+        for (var i = 0; i < blockedRanges.length; i++) {
+            var range = blockedRanges[i];
+            var currentDate = range.start_date;
+            var endDate = range.end_date;
+            var safety = 0;
+
+            while (currentDate && endDate && currentDate <= endDate && safety < 730) {
+                var existing = blockedDatesByDay[currentDate];
+                var nextEntry = {
+                    source: range.source,
+                    reason: range.reason || '',
+                    status: range.status || '',
+                    start_date: range.start_date,
+                    end_date: range.end_date,
+                    label: rangeLabel(range),
+                    priority: sourcePriority(range.source)
+                };
+
+                if (!existing || nextEntry.priority >= existing.priority) {
+                    blockedDatesByDay[currentDate] = nextEntry;
+                }
+
+                currentDate = addDays(currentDate, 1);
+                safety++;
+            }
+        }
+    }
+
     function dateRangeConflicts(start, end) {
         for (var i = 0; i < blockedRanges.length; i++) {
             if (start <= blockedRanges[i].end_date && end >= blockedRanges[i].start_date) {
@@ -111,11 +207,156 @@ if (bookingForm) {
         bookingTotal.textContent = 'Estimated total: Rs. ' + total.toFixed(2);
     }
 
+    function renderCalendar() {
+        if (!availabilityCalendar || !calendarMonths) {
+            return;
+        }
+
+        calendarMonths.innerHTML = '';
+
+        var selectedStart = bookingStart ? bookingStart.value : '';
+        var selectedEnd = bookingEnd ? bookingEnd.value : '';
+        var now = new Date();
+
+        for (var monthIndex = 0; monthIndex < calendarVisibleMonths; monthIndex++) {
+            var monthDate = new Date(now.getFullYear(), now.getMonth() + calendarMonthOffset + monthIndex, 1);
+            var monthCard = document.createElement('section');
+            monthCard.className = 'calendar-month';
+
+            var monthTitle = document.createElement('h4');
+            monthTitle.textContent = monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+            monthCard.appendChild(monthTitle);
+
+            var weekRow = document.createElement('div');
+            weekRow.className = 'calendar-weekdays';
+
+            for (var weekday = 0; weekday < 7; weekday++) {
+                var weekdayCell = document.createElement('span');
+                weekdayCell.textContent = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][weekday];
+                weekRow.appendChild(weekdayCell);
+            }
+
+            monthCard.appendChild(weekRow);
+
+            var monthGrid = document.createElement('div');
+            monthGrid.className = 'calendar-grid';
+
+            for (var blank = 0; blank < monthDate.getDay(); blank++) {
+                var emptyCell = document.createElement('span');
+                emptyCell.className = 'calendar-day is-empty';
+                monthGrid.appendChild(emptyCell);
+            }
+
+            var totalDays = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+
+            for (var day = 1; day <= totalDays; day++) {
+                var dayDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+                var dateKey = formatDateKey(dayDate);
+                var dayInfo = blockedDatesByDay[dateKey];
+                var dayButton = document.createElement('button');
+                var note = document.createElement('small');
+
+                dayButton.type = 'button';
+                dayButton.className = 'calendar-day';
+                dayButton.setAttribute('data-date', dateKey);
+
+                if (dateKey === formatDateKey(new Date())) {
+                    dayButton.className += ' is-today';
+                }
+
+                if (dayInfo) {
+                    dayButton.className += dayInfo.source === 'booking' ? ' is-booked' : ' is-maintenance';
+                    dayButton.title = dayInfo.label + ' (' + dayInfo.start_date + ' to ' + dayInfo.end_date + ')';
+                } else {
+                    dayButton.className += ' is-available';
+                    dayButton.title = 'Available';
+                }
+
+                if (selectedStart && dateKey === selectedStart) {
+                    dayButton.className += ' is-selected-start';
+                }
+
+                if (selectedEnd && dateKey === selectedEnd) {
+                    dayButton.className += ' is-selected-end';
+                }
+
+                if (selectedStart && selectedEnd && dateKey >= selectedStart && dateKey <= selectedEnd) {
+                    dayButton.className += ' is-selected-range';
+                }
+
+                dayButton.textContent = String(day);
+                note.textContent = dayInfo ? sourceLabel(dayInfo.source) : 'Open';
+                dayButton.appendChild(note);
+
+                dayButton.onclick = (function (selectedDate, selectedInfo) {
+                    return function () {
+                        if (!bookingStart || !bookingEnd || selectedInfo) {
+                            return;
+                        }
+
+                        if (!bookingStart.value || bookingEnd.value) {
+                            bookingStart.value = selectedDate;
+                            bookingEnd.value = '';
+                            bookingEnd.min = selectedDate;
+                            setBookingMessage('Start date selected. Choose an end date.', 'wait');
+                        } else if (selectedDate < bookingStart.value) {
+                            bookingStart.value = selectedDate;
+                            bookingEnd.value = '';
+                            bookingEnd.min = selectedDate;
+                            setBookingMessage('Start date updated. Choose an end date.', 'wait');
+                        } else {
+                            bookingEnd.value = selectedDate;
+                            validateBookingDates();
+                        }
+
+                        renderCalendar();
+                    };
+                })(dateKey, dayInfo);
+
+                monthGrid.appendChild(dayButton);
+            }
+
+            monthCard.appendChild(monthGrid);
+            calendarMonths.appendChild(monthCard);
+        }
+    }
+
     function validateBookingDates() {
         var start = bookingStart ? bookingStart.value : '';
         var end = bookingEnd ? bookingEnd.value : '';
 
-        if (start === '' || end === '' || end < start) {
+        if (!bookingForm) {
+            renderCalendar();
+            return;
+        }
+
+        if (start === '' && end === '') {
+            if (bookingError) {
+                bookingError.textContent = '';
+            }
+            setBookingMessage('Choose start and end dates. Unavailable days are marked in the calendar.', 'wait');
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+            updateBookingTotal();
+            renderCalendar();
+            return;
+        }
+
+        if (start !== '' && end === '') {
+            if (bookingError) {
+                bookingError.textContent = '';
+            }
+            setBookingMessage('Start date selected. Choose an end date.', 'wait');
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+            updateBookingTotal();
+            renderCalendar();
+            return;
+        }
+
+        if (start === '' || end < start) {
             if (bookingError) {
                 bookingError.textContent = 'End date must be the same day or later than start date.';
             }
@@ -124,6 +365,7 @@ if (bookingForm) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
+            renderCalendar();
             return;
         }
 
@@ -132,11 +374,12 @@ if (bookingForm) {
             if (bookingError) {
                 bookingError.textContent = 'Vehicle is unavailable for the selected dates.';
             }
-            setBookingMessage('Unavailable: ' + conflict.start_date + ' to ' + conflict.end_date + ' is blocked.', 'bad');
+            setBookingMessage(rangeLabel(conflict) + ' is already blocking ' + conflict.start_date + ' to ' + conflict.end_date + '.', 'bad');
             if (submitButton) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
+            renderCalendar();
             return;
         }
 
@@ -148,12 +391,35 @@ if (bookingForm) {
             submitButton.disabled = false;
         }
         updateBookingTotal();
+        renderCalendar();
+    }
+
+    function updateCalendarSummary() {
+        var blockedDays = 0;
+        var bookedDays = 0;
+
+        for (var dateKey in blockedDatesByDay) {
+            if (!Object.prototype.hasOwnProperty.call(blockedDatesByDay, dateKey)) {
+                continue;
+            }
+
+            blockedDays++;
+            if (blockedDatesByDay[dateKey].source === 'booking') {
+                bookedDays++;
+            }
+        }
+
+        if (blockedDays === 0) {
+            setCalendarSummary('No unavailable dates found right now. Use the next and previous buttons to review nearby months.');
+            return;
+        }
+
+        setCalendarSummary(bookedDays + ' booked day(s) and ' + (blockedDays - bookedDays) + ' maintenance / blocked day(s) are marked unavailable.');
     }
 
     function loadBlockedDates() {
-        var vehicleId = bookingForm.getAttribute('data-vehicle-id');
-
         if (!vehicleId) {
+            setCalendarSummary('Vehicle id is missing, so the calendar could not be loaded.');
             validateBookingDates();
             return;
         }
@@ -164,13 +430,22 @@ if (bookingForm) {
             })
             .then(function (json) {
                 blockedRanges = json && json.success && json.data && json.data.ranges ? json.data.ranges : [];
-                if (blockedRanges.length > 0) {
+                cacheBlockedDates();
+                updateCalendarSummary();
+
+                if (blockedRanges.length > 0 && bookingForm) {
                     setBookingMessage(blockedRanges.length + ' unavailable range(s) loaded.', 'wait');
                 }
+
                 validateBookingDates();
             })
             .catch(function () {
-                setBookingMessage('Could not load availability. Dates will be checked again on submit.', 'wait');
+                blockedRanges = [];
+                blockedDatesByDay = {};
+                setCalendarSummary('Could not load the availability calendar right now. Date checks will still run when booking is submitted.');
+                if (bookingForm) {
+                    setBookingMessage('Could not load availability. Dates will be checked again on submit.', 'wait');
+                }
                 validateBookingDates();
             });
     }
@@ -192,14 +467,31 @@ if (bookingForm) {
         driverCheck.addEventListener('change', updateBookingTotal);
     }
 
-    bookingForm.onsubmit = function () {
-        validateBookingDates();
-        if (submitButton && submitButton.disabled) {
-            return false;
-        }
-        return true;
-    };
+    if (calendarPrev) {
+        calendarPrev.onclick = function () {
+            calendarMonthOffset--;
+            renderCalendar();
+        };
+    }
 
+    if (calendarNext) {
+        calendarNext.onclick = function () {
+            calendarMonthOffset++;
+            renderCalendar();
+        };
+    }
+
+    if (bookingForm) {
+        bookingForm.onsubmit = function () {
+            validateBookingDates();
+            if (submitButton && submitButton.disabled) {
+                return false;
+            }
+            return true;
+        };
+    }
+
+    renderCalendar();
     loadBlockedDates();
 }
 
