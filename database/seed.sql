@@ -72,6 +72,6 @@ VALUES
 (3, 2, '2026-05-10 00:00:00', '2026-05-12 23:59:59', 'Basic service and oil change', 3);
 
 INSERT INTO maintenance_records
-(vehicle_id, company_id, title, description, cost, start_datetime, end_datetime, status, availability_block_id, created_by_user_id)
+(vehicle_id, company_id, title, description, cost, start_date, end_date, start_datetime, end_datetime, status, availability_block_id, created_by_user_id)
 VALUES
-(3, 2, 'Basic service and oil change', 'Seed maintenance record linked to blocked availability.', 0.00, '2026-05-10 00:00:00', '2026-05-12 23:59:59', 'scheduled', 1, 3);
+(3, 2, 'Basic service and oil change', 'Seed maintenance record linked to blocked availability.', 0.00, '2026-05-10', '2026-05-12', '2026-05-10 00:00:00', '2026-05-12 23:59:59', 'scheduled', 1, 3);

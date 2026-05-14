@@ -208,6 +208,8 @@ CREATE TABLE maintenance_records (
     title VARCHAR(150) NOT NULL,
     description TEXT NULL,
     cost DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
     start_datetime DATETIME NOT NULL,
     end_datetime DATETIME NOT NULL,
     status ENUM('scheduled', 'in_progress', 'completed', 'cancelled') NOT NULL DEFAULT 'scheduled',
@@ -226,4 +228,5 @@ CREATE INDEX idx_bookings_stripe_session ON bookings(stripe_session_id);
 CREATE INDEX idx_bookings_stripe_payment_intent ON bookings(stripe_payment_intent_id);
 CREATE INDEX idx_bookings_vehicle_dates ON bookings(vehicle_id, start_datetime, end_datetime);
 CREATE INDEX idx_availability_vehicle_dates ON availability_blocks(vehicle_id, start_datetime, end_datetime);
+CREATE INDEX idx_maintenance_vehicle_days ON maintenance_records(vehicle_id, start_date, end_date);
 CREATE INDEX idx_maintenance_vehicle_dates ON maintenance_records(vehicle_id, start_datetime, end_datetime);
