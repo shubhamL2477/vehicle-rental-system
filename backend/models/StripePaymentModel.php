@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../includes/functions.php';
 
 class StripePaymentModel
 {
+    private const WEBHOOK_TOLERANCE_SECONDS = 300;
+
     public static function requireCheckoutConfig()
     {
         if (STRIPE_SECRET_KEY === '') {
@@ -18,8 +20,6 @@ class StripePaymentModel
 
     public static function requireWebhookConfig()
     {
-        self::requireCheckoutConfig();
-
         if (STRIPE_WEBHOOK_SECRET === '') {
             throw new RuntimeException('Stripe webhook secret is missing. Set STRIPE_WEBHOOK_SECRET before testing webhooks.');
         }
@@ -96,9 +96,40 @@ class StripePaymentModel
     public static function verifyWebhookEvent($payload, $signatureHeader)
     {
         self::requireWebhookConfig();
-        self::configureStripe();
 
-        return \Stripe\Webhook::constructEvent($payload, $signatureHeader, STRIPE_WEBHOOK_SECRET);
+        $timestamp = self::signatureTimestamp($signatureHeader);
+        $signatures = self::signatureValues($signatureHeader, 'v1');
+
+        if ($timestamp < 1 || empty($signatures)) {
+            throw new RuntimeException('Stripe signature header is invalid.');
+        }
+
+        if (abs(time() - $timestamp) > self::WEBHOOK_TOLERANCE_SECONDS) {
+            throw new RuntimeException('Stripe signature timestamp is outside the allowed tolerance.');
+        }
+
+        $signedPayload = $timestamp . '.' . $payload;
+        $expectedSignature = hash_hmac('sha256', $signedPayload, STRIPE_WEBHOOK_SECRET);
+        $verified = false;
+
+        foreach ($signatures as $signature) {
+            if (hash_equals($expectedSignature, $signature)) {
+                $verified = true;
+                break;
+            }
+        }
+
+        if (!$verified) {
+            throw new RuntimeException('Stripe signature verification failed.');
+        }
+
+        $event = json_decode($payload);
+
+        if (!is_object($event) || !isset($event->type)) {
+            throw new RuntimeException('Stripe webhook payload is invalid JSON.');
+        }
+
+        return $event;
     }
 
     public static function handleWebhookEvent($event)
@@ -152,6 +183,17 @@ class StripePaymentModel
     {
         self::requireCheckoutConfig();
 
+        self::loadStripeLibrary();
+
+        \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+
+        if (method_exists('\Stripe\Stripe', 'setApiVersion')) {
+            \Stripe\Stripe::setApiVersion(STRIPE_API_VERSION);
+        }
+    }
+
+    private static function loadStripeLibrary()
+    {
         $autoloadPath = APP_ROOT . '/vendor/autoload.php';
 
         if (!file_exists($autoloadPath)) {
@@ -159,12 +201,6 @@ class StripePaymentModel
         }
 
         require_once $autoloadPath;
-
-        \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
-
-        if (method_exists('\Stripe\Stripe', 'setApiVersion')) {
-            \Stripe\Stripe::setApiVersion(STRIPE_API_VERSION);
-        }
     }
 
     private static function markByCheckoutSession($object, $paymentStatus)
@@ -244,5 +280,33 @@ class StripePaymentModel
         }
 
         return '';
+    }
+
+    private static function signatureTimestamp($signatureHeader)
+    {
+        foreach (explode(',', (string) $signatureHeader) as $part) {
+            $pair = explode('=', trim($part), 2);
+
+            if (count($pair) === 2 && $pair[0] === 't') {
+                return (int) $pair[1];
+            }
+        }
+
+        return 0;
+    }
+
+    private static function signatureValues($signatureHeader, $version)
+    {
+        $signatures = [];
+
+        foreach (explode(',', (string) $signatureHeader) as $part) {
+            $pair = explode('=', trim($part), 2);
+
+            if (count($pair) === 2 && $pair[0] === $version && $pair[1] !== '') {
+                $signatures[] = $pair[1];
+            }
+        }
+
+        return $signatures;
     }
 }
