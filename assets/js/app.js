@@ -54,6 +54,9 @@ if (bookingForm) {
     var blockedRanges = [];
     var blockedVehicleId = '';
     var availabilityLoading = false;
+    var availabilityLoadFailed = false;
+    var submitReady = false;
+    var submitChecking = false;
 
     function updateSelectedVehicle() {
         if (!vehicleSelect) {
@@ -100,6 +103,31 @@ if (bookingForm) {
         availabilityStatus.className = 'availability-status ' + (type || '');
     }
 
+    function setDateValidation(message) {
+        if (bookingStart) {
+            bookingStart.setCustomValidity('');
+        }
+
+        if (bookingEnd) {
+            bookingEnd.setCustomValidity(message || '');
+        }
+    }
+
+    function updateDatePickerState() {
+        if (!bookingStart || !bookingEnd) {
+            return;
+        }
+
+        if (!bookingStart.value) {
+            bookingEnd.value = '';
+            bookingEnd.disabled = true;
+            return;
+        }
+
+        bookingEnd.disabled = false;
+        bookingEnd.min = bookingStart.value;
+    }
+
     function dateRangeConflicts(start, end) {
         for (var i = 0; i < blockedRanges.length; i++) {
             if (start <= blockedRanges[i].end_date && end >= blockedRanges[i].start_date) {
@@ -131,11 +159,14 @@ if (bookingForm) {
 
     function validateBookingDates() {
         updateSelectedVehicle();
+        updateDatePickerState();
+        setDateValidation('');
         var start = bookingStart ? bookingStart.value : '';
         var end = bookingEnd ? bookingEnd.value : '';
         var vehicleId = bookingForm.getAttribute('data-vehicle-id');
 
         if (!vehicleId) {
+            setDateValidation('Please choose a vehicle.');
             if (bookingError) {
                 bookingError.textContent = 'Please choose a vehicle.';
             }
@@ -144,7 +175,20 @@ if (bookingForm) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
-            return;
+            return false;
+        }
+
+        if (availabilityLoadFailed) {
+            setDateValidation('Please wait until availability can be checked.');
+            if (bookingError) {
+                bookingError.textContent = 'Availability could not be checked. Please try again.';
+            }
+            setBookingMessage('Could not confirm availability. Try again before submitting.', 'bad');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            updateBookingTotal();
+            return false;
         }
 
         if (blockedVehicleId !== vehicleId) {
@@ -156,7 +200,7 @@ if (bookingForm) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
-            return;
+            return false;
         }
 
         if (start === '' || end === '') {
@@ -168,10 +212,11 @@ if (bookingForm) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
-            return;
+            return false;
         }
 
         if (end < start) {
+            setDateValidation('End date must be the same day or later than start date.');
             if (bookingError) {
                 bookingError.textContent = 'End date must be the same day or later than start date.';
             }
@@ -180,12 +225,13 @@ if (bookingForm) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
-            return;
+            return false;
         }
 
         var conflict = dateRangeConflicts(start, end);
         if (conflict) {
             var conflictLabel = conflict.reason || conflict.status || conflict.source || 'blocked';
+            setDateValidation('Vehicle is unavailable for the selected dates.');
             if (bookingError) {
                 bookingError.textContent = 'Vehicle is unavailable for the selected dates.';
             }
@@ -194,7 +240,7 @@ if (bookingForm) {
                 submitButton.disabled = true;
             }
             updateBookingTotal();
-            return;
+            return false;
         }
 
         if (bookingError) {
@@ -205,6 +251,44 @@ if (bookingForm) {
             submitButton.disabled = false;
         }
         updateBookingTotal();
+        return true;
+    }
+
+    function fetchBlockedDates(vehicleId, message) {
+        availabilityLoadFailed = false;
+        availabilityLoading = true;
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        setBookingMessage(message || 'Checking live availability...', 'wait');
+
+        return fetch('api/vehicles/booked_dates.php?vehicle_id=' + encodeURIComponent(vehicleId))
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error('Availability request failed.');
+                }
+
+                return res.json();
+            })
+            .then(function (json) {
+                if (!json || !json.success) {
+                    throw new Error('Availability response was not successful.');
+                }
+
+                blockedVehicleId = vehicleId;
+                blockedRanges = json.data && json.data.ranges ? json.data.ranges : [];
+                return blockedRanges;
+            })
+            .catch(function () {
+                availabilityLoadFailed = true;
+                blockedVehicleId = '';
+                blockedRanges = [];
+                return null;
+            })
+            .then(function (ranges) {
+                availabilityLoading = false;
+                return ranges;
+            });
     }
 
     function loadBlockedDates() {
@@ -216,37 +300,16 @@ if (bookingForm) {
             return;
         }
 
-        if (submitButton) {
-            submitButton.disabled = true;
-        }
-        availabilityLoading = true;
-        setBookingMessage('Checking live availability...', 'wait');
-
-        fetch('api/vehicles/booked_dates.php?vehicle_id=' + encodeURIComponent(vehicleId))
-            .then(function (res) {
-                return res.json();
-            })
-            .then(function (json) {
-                if (vehicleId !== bookingForm.getAttribute('data-vehicle-id')) {
+        return fetchBlockedDates(vehicleId)
+            .then(function (ranges) {
+                if (vehicleId !== bookingForm.getAttribute('data-vehicle-id') || ranges === null) {
+                    validateBookingDates();
                     return;
                 }
 
-                availabilityLoading = false;
-                blockedVehicleId = vehicleId;
-                blockedRanges = json && json.success && json.data && json.data.ranges ? json.data.ranges : [];
                 if (blockedRanges.length > 0) {
                     setBookingMessage(blockedRanges.length + ' unavailable range(s) loaded.', 'wait');
                 }
-                validateBookingDates();
-            })
-            .catch(function () {
-                if (vehicleId !== bookingForm.getAttribute('data-vehicle-id')) {
-                    return;
-                }
-
-                availabilityLoading = false;
-                blockedVehicleId = vehicleId;
-                setBookingMessage('Could not load availability. Dates will be checked again on submit.', 'wait');
                 validateBookingDates();
             });
     }
@@ -262,9 +325,7 @@ if (bookingForm) {
 
     if (bookingStart) {
         bookingStart.onchange = function () {
-            if (bookingEnd && bookingStart.value) {
-                bookingEnd.min = bookingStart.value;
-            }
+            updateDatePickerState();
             validateBookingDates();
         };
     }
@@ -277,15 +338,49 @@ if (bookingForm) {
         driverCheck.addEventListener('change', updateBookingTotal);
     }
 
-    bookingForm.onsubmit = function () {
-        validateBookingDates();
-        if (submitButton && submitButton.disabled) {
-            return false;
+    bookingForm.addEventListener('submit', function (event) {
+        if (submitReady) {
+            submitReady = false;
+            return;
         }
-        return true;
-    };
+
+        event.preventDefault();
+
+        if (submitChecking) {
+            return;
+        }
+
+        if (!validateBookingDates()) {
+            if (bookingEnd) {
+                bookingEnd.reportValidity();
+            }
+            return;
+        }
+
+        submitChecking = true;
+        updateSelectedVehicle();
+        fetchBlockedDates(bookingForm.getAttribute('data-vehicle-id'), 'Rechecking availability before submit...')
+            .then(function () {
+                submitChecking = false;
+
+                if (!validateBookingDates()) {
+                    if (bookingEnd) {
+                        bookingEnd.reportValidity();
+                    }
+                    return;
+                }
+
+                submitReady = true;
+                if (bookingForm.requestSubmit) {
+                    bookingForm.requestSubmit(submitButton);
+                } else {
+                    bookingForm.submit();
+                }
+            });
+    });
 
     updateSelectedVehicle();
+    updateDatePickerState();
     loadBlockedDates();
 }
 
