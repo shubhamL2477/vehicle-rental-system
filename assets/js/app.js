@@ -41,6 +41,7 @@ if (registerForm) {
 var bookingForm = document.querySelector('[data-booking-form]');
 if (bookingForm) {
     var driverCheck = bookingForm.querySelector('[data-driver-check]');
+    var vehicleSelect = bookingForm.querySelector('[data-vehicle-select]');
     var documentBox = bookingForm.querySelector('[data-document-box]');
     var docFile = bookingForm.querySelector('[data-doc-file]');
     var licenseFile = bookingForm.querySelector('[data-license-file]');
@@ -51,6 +52,23 @@ if (bookingForm) {
     var bookingTotal = bookingForm.querySelector('[data-booking-total]');
     var submitButton = bookingForm.querySelector('button[type="submit"]');
     var blockedRanges = [];
+    var blockedVehicleId = '';
+    var availabilityLoading = false;
+
+    function updateSelectedVehicle() {
+        if (!vehicleSelect) {
+            return;
+        }
+
+        var selectedOption = vehicleSelect.options[vehicleSelect.selectedIndex];
+        if (!selectedOption) {
+            return;
+        }
+
+        bookingForm.setAttribute('data-vehicle-id', vehicleSelect.value);
+        bookingForm.dataset.selfRate = selectedOption.getAttribute('data-self-rate') || '0';
+        bookingForm.dataset.driverRate = selectedOption.getAttribute('data-driver-rate') || '0';
+    }
 
     function updateDocumentFields() {
         if (!driverCheck || !documentBox) {
@@ -108,14 +126,52 @@ if (bookingForm) {
 
         var rate = Number(driverCheck && driverCheck.checked ? bookingForm.dataset.driverRate : bookingForm.dataset.selfRate);
         var total = dateDiffDays(bookingStart.value, bookingEnd.value) * rate;
-        bookingTotal.textContent = 'Estimated total: Rs. ' + total.toFixed(2);
+        bookingTotal.textContent = rate > 0 ? 'Estimated total: Rs. ' + total.toFixed(2) : '';
     }
 
     function validateBookingDates() {
+        updateSelectedVehicle();
         var start = bookingStart ? bookingStart.value : '';
         var end = bookingEnd ? bookingEnd.value : '';
+        var vehicleId = bookingForm.getAttribute('data-vehicle-id');
 
-        if (start === '' || end === '' || end < start) {
+        if (!vehicleId) {
+            if (bookingError) {
+                bookingError.textContent = 'Please choose a vehicle.';
+            }
+            setBookingMessage('Choose a vehicle to check availability.', 'bad');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            updateBookingTotal();
+            return;
+        }
+
+        if (blockedVehicleId !== vehicleId) {
+            if (!availabilityLoading) {
+                loadBlockedDates();
+            }
+            setBookingMessage('Checking live availability...', 'wait');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            updateBookingTotal();
+            return;
+        }
+
+        if (start === '' || end === '') {
+            if (bookingError) {
+                bookingError.textContent = '';
+            }
+            setBookingMessage('Choose dates to check availability.', 'wait');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            updateBookingTotal();
+            return;
+        }
+
+        if (end < start) {
             if (bookingError) {
                 bookingError.textContent = 'End date must be the same day or later than start date.';
             }
@@ -129,10 +185,11 @@ if (bookingForm) {
 
         var conflict = dateRangeConflicts(start, end);
         if (conflict) {
+            var conflictLabel = conflict.reason || conflict.status || conflict.source || 'blocked';
             if (bookingError) {
                 bookingError.textContent = 'Vehicle is unavailable for the selected dates.';
             }
-            setBookingMessage('Unavailable: ' + conflict.start_date + ' to ' + conflict.end_date + ' is blocked.', 'bad');
+            setBookingMessage('Unavailable: ' + conflict.start_date + ' to ' + conflict.end_date + ' is blocked by ' + conflictLabel + '.', 'bad');
             if (submitButton) {
                 submitButton.disabled = true;
             }
@@ -151,6 +208,7 @@ if (bookingForm) {
     }
 
     function loadBlockedDates() {
+        updateSelectedVehicle();
         var vehicleId = bookingForm.getAttribute('data-vehicle-id');
 
         if (!vehicleId) {
@@ -158,11 +216,23 @@ if (bookingForm) {
             return;
         }
 
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        availabilityLoading = true;
+        setBookingMessage('Checking live availability...', 'wait');
+
         fetch('api/vehicles/booked_dates.php?vehicle_id=' + encodeURIComponent(vehicleId))
             .then(function (res) {
                 return res.json();
             })
             .then(function (json) {
+                if (vehicleId !== bookingForm.getAttribute('data-vehicle-id')) {
+                    return;
+                }
+
+                availabilityLoading = false;
+                blockedVehicleId = vehicleId;
                 blockedRanges = json && json.success && json.data && json.data.ranges ? json.data.ranges : [];
                 if (blockedRanges.length > 0) {
                     setBookingMessage(blockedRanges.length + ' unavailable range(s) loaded.', 'wait');
@@ -170,9 +240,24 @@ if (bookingForm) {
                 validateBookingDates();
             })
             .catch(function () {
+                if (vehicleId !== bookingForm.getAttribute('data-vehicle-id')) {
+                    return;
+                }
+
+                availabilityLoading = false;
+                blockedVehicleId = vehicleId;
                 setBookingMessage('Could not load availability. Dates will be checked again on submit.', 'wait');
                 validateBookingDates();
             });
+    }
+
+    if (vehicleSelect) {
+        vehicleSelect.addEventListener('change', function () {
+            updateSelectedVehicle();
+            blockedRanges = [];
+            blockedVehicleId = '';
+            loadBlockedDates();
+        });
     }
 
     if (bookingStart) {
@@ -200,6 +285,7 @@ if (bookingForm) {
         return true;
     };
 
+    updateSelectedVehicle();
     loadBlockedDates();
 }
 

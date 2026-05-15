@@ -55,6 +55,6 @@
 <footer class="footer">
     <p>Hyrox Rental - Sprint 1</p>
 </footer>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/app.js')) ?>"></script>
 </body>
 </html>

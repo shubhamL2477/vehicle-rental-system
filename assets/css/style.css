@@ -169,6 +169,23 @@ main {
     gap: 10px;
 }
 
+.booking-date-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.booking-date-grid label {
+    display: grid;
+    gap: 6px;
+}
+
+.booking-date-grid span {
+    color: #667085;
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .form-logo {
     width: 130px;
     max-height: 85px;
@@ -897,6 +914,10 @@ td {
     }
 
     .chatbot-form {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-date-grid {
         grid-template-columns: 1fr;
     }
 }

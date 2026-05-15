@@ -22,6 +22,13 @@ if (!$vehicle) {
 
 $pageTitle = $vehicle['name'];
 $maintenance = db_all('SELECT * FROM maintenance WHERE vehicle_id = ? ORDER BY start_date DESC', [$id]);
+$bookingVehicles = db_all(
+    'SELECT v.id, v.name, v.location, v.self_drive_price, v.with_driver_price, u.company_name
+     FROM vehicles v
+     JOIN users u ON u.id = v.company_id
+     WHERE v.status = "available"
+     ORDER BY v.name ASC'
+);
 $reviewStats = vehicle_review_stats($id);
 $reviews = db_all(
     'SELECT r.*, u.name AS user_name
@@ -65,15 +72,36 @@ require __DIR__ . '/includes/header.php';
             <a class="btn" href="login.php">Login</a>
         <?php elseif ($me['role_name'] !== 'user'): ?>
             <p>Only user accounts can book vehicles.</p>
+        <?php elseif (!$bookingVehicles): ?>
+            <p>No available vehicles can be booked right now.</p>
         <?php else: ?>
             <form class="simple-form" action="actions/booking.php" method="post" enctype="multipart/form-data" data-booking-form data-vehicle-id="<?= e($vehicle['id']) ?>" data-self-rate="<?= e($vehicle['self_drive_price']) ?>" data-driver-rate="<?= e($vehicle['with_driver_price']) ?>">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="create">
-                <input type="hidden" name="vehicle_id" value="<?= e($vehicle['id']) ?>">
-                <label>Start date</label>
-                <input type="date" name="start_date" min="<?= e(date('Y-m-d')) ?>" required>
-                <label>End date</label>
-                <input type="date" name="end_date" min="<?= e(date('Y-m-d')) ?>" required>
+                <label>Vehicle</label>
+                <select name="vehicle_id" required data-vehicle-select>
+                    <?php foreach ($bookingVehicles as $bookingVehicle): ?>
+                        <option
+                            value="<?= e($bookingVehicle['id']) ?>"
+                            data-self-rate="<?= e($bookingVehicle['self_drive_price']) ?>"
+                            data-driver-rate="<?= e($bookingVehicle['with_driver_price']) ?>"
+                            <?= (int) $bookingVehicle['id'] === (int) $vehicle['id'] ? 'selected' : '' ?>
+                        >
+                            <?= e($bookingVehicle['name']) ?> - <?= e($bookingVehicle['company_name']) ?>, <?= e($bookingVehicle['location']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="booking-date-grid">
+                    <label>
+                        <span>Start date</span>
+                        <input type="date" name="start_date" min="<?= e(date('Y-m-d')) ?>" required>
+                    </label>
+                    <label>
+                        <span>End date</span>
+                        <input type="date" name="end_date" min="<?= e(date('Y-m-d')) ?>" required>
+                    </label>
+                </div>
+                <p class="availability-status" data-availability-status>Choose dates to check availability.</p>
                 <label class="check-line">
                     <input type="checkbox" name="with_driver" value="1" data-driver-check>
                     Book with driver
@@ -94,7 +122,6 @@ require __DIR__ . '/includes/header.php';
                     <input type="file" name="license_file" data-license-file required>
                 </div>
                 <p class="muted">Documents are required only for self-drive booking.</p>
-                <p class="availability-status" data-availability-status>Choose dates to check availability.</p>
                 <p class="muted" data-booking-total></p>
                 <label class="check-line">
                     <input type="checkbox" name="terms_accepted" value="1" required>
