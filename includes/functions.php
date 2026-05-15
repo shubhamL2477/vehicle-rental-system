@@ -604,7 +604,7 @@ function user_can_review_booking($booking)
         return false;
     }
 
-    if (!in_array($booking['status'], ['approved', 'confirmed', 'completed'], true)) {
+    if (($booking['status'] ?? '') !== 'completed') {
         return false;
     }
 

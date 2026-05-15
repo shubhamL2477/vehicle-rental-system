@@ -692,6 +692,99 @@ td {
     font-weight: 800;
 }
 
+.booking-detail-head {
+    max-width: 1180px;
+    margin: 0 auto 18px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.booking-detail-head h1 {
+    margin-bottom: 4px;
+}
+
+.booking-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.booking-detail-grid > span {
+    background: #fbfcfe;
+    border: 1px solid #edf0f4;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.booking-detail-grid b {
+    display: block;
+    color: #667085;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.review-form {
+    max-width: 720px;
+}
+
+.star-rating {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.star-rating label {
+    cursor: pointer;
+    border: 1px solid #d9e2ef;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fbfcfe;
+    color: #92400e;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.star-rating input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.star-rating label:has(input:checked) {
+    border-color: #1b5fd1;
+    box-shadow: 0 0 0 3px rgba(27, 95, 209, 0.12);
+    background: #eef4ff;
+}
+
+.star-rating small {
+    color: #667085;
+}
+
+.submitted-stars {
+    color: #92400e;
+    background: #fff7d6;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    padding: 12px;
+    width: fit-content;
+}
+
+.review-state-card {
+    border: 1px solid #e4e7ec;
+    background: #fbfcfe;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.btn:disabled,
+.btn[disabled] {
+    background: #e5e7eb;
+    color: #667085;
+    cursor: not-allowed;
+}
+
 .form-error {
     color: #b42318;
     min-height: 18px;
@@ -861,7 +954,9 @@ td {
     .booking-actions,
     .payment-summary,
     .review-grid,
-    .rating-overview {
+    .rating-overview,
+    .booking-detail-grid,
+    .star-rating {
         display: block;
     }
 
@@ -882,7 +977,9 @@ td {
     .search-bar .btn,
     .booking-actions form,
     .payment-summary span,
-    .review-card {
+    .review-card,
+    .booking-detail-grid > span,
+    .star-rating label {
         margin-bottom: 10px;
         width: 100%;
     }

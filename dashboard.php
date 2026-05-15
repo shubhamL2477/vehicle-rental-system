@@ -101,7 +101,7 @@ require __DIR__ . '/includes/header.php';
          JOIN users u ON u.id = b.company_id
          LEFT JOIN reviews r ON r.booking_id = b.id
          WHERE b.user_id = ?
-           AND b.status IN ("approved", "confirmed", "completed")
+          AND b.status = "completed"
            AND b.payment_status = "paid"
            AND b.end_date <= CURDATE()
            AND r.id IS NULL
@@ -166,6 +166,7 @@ require __DIR__ . '/includes/header.php';
                         </div>
                         <p><?= e($b['company_name']) ?></p>
                         <p><?= e($b['start_date']) ?> to <?= e($b['end_date']) ?></p>
+                        <a class="btn light small" href="booking-detail.php?id=<?= e($b['id']) ?>">View details</a>
                         <p><b><?= e(money($b['total_price'])) ?></b> · <?= $b['with_driver'] ? 'With driver' : 'Self drive' ?></p>
                     </article>
                 <?php endforeach; ?>
@@ -211,6 +212,7 @@ require __DIR__ . '/includes/header.php';
                             <span><b>Payment</b><span class="<?= e(payment_badge($bookingPaymentStatus)) ?>"><?= e($bookingPaymentStatus) ?></span></span>
                             <span><b>Note</b><?= e($b['agent_note'] ?: 'No note') ?></span>
                         </div>
+                        <p><a class="btn light small" href="booking-detail.php?id=<?= e($b['id']) ?>">View details</a></p>
 
                         <?php if (in_array($b['status'], ['pending', 'approved'], true)): ?>
                             <div class="booking-actions">
@@ -290,7 +292,7 @@ require __DIR__ . '/includes/header.php';
             <div class="panel-title-row">
                 <div>
                     <h2>Reviews</h2>
-                    <p class="muted">Reviews are allowed only after a rental is paid and the trip end date has passed.</p>
+                    <p class="muted">Reviews are allowed only after a rental is completed, paid, and the trip end date has passed.</p>
                 </div>
             </div>
 
@@ -323,7 +325,7 @@ require __DIR__ . '/includes/header.php';
             <?php if (!$reviewableBookings): ?>
                 <div class="empty-state">
                     <h3>No rentals ready for review</h3>
-                    <p>A booking becomes reviewable after payment is successful and the end date has passed.</p>
+                    <p>A booking becomes reviewable after it is completed, paid, and the end date has passed.</p>
                 </div>
             <?php endif; ?>
         </section>

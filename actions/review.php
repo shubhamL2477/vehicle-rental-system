@@ -11,6 +11,7 @@ if ($action === 'create') {
     $bookingId = (int) ($_POST['booking_id'] ?? 0);
     $rating = (int) ($_POST['rating'] ?? 0);
     $comment = trim($_POST['comment'] ?? '');
+    $reviewRedirect = $bookingId > 0 ? '../booking-detail.php?id=' . $bookingId : '../dashboard.php?section=reviews';
 
     $booking = db_one(
         'SELECT * FROM bookings WHERE id = ? AND user_id = ?',
@@ -19,22 +20,22 @@ if ($action === 'create') {
 
     if (!$booking) {
         flash('Booking not found for review.', 'danger');
-        go('../dashboard.php?section=reviews');
+        go($reviewRedirect);
     }
 
     if (!user_can_review_booking($booking)) {
         flash('You can review only after a paid rental is completed.', 'danger');
-        go('../dashboard.php?section=reviews');
+        go($reviewRedirect);
     }
 
     if ($rating < 1 || $rating > 5) {
         flash('Rating must be between 1 and 5.', 'danger');
-        go('../dashboard.php?section=reviews');
+        go($reviewRedirect);
     }
 
     if (db_one('SELECT id FROM reviews WHERE booking_id = ?', [$bookingId])) {
         flash('This booking already has a review.', 'warning');
-        go('../dashboard.php?section=reviews');
+        go($reviewRedirect);
     }
 
     db_run(
@@ -44,7 +45,7 @@ if ($action === 'create') {
     );
 
     flash('Review submitted successfully.', 'success');
-    go('../dashboard.php?section=reviews');
+    go($reviewRedirect);
 }
 
 if ($action === 'site_rating') {
