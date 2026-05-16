@@ -394,6 +394,58 @@ if (chatbotWidget) {
         return 'Rs. ' + Number(amount || 0).toFixed(2);
     }
 
+    function chatbotAvailabilityUrl(preferences) {
+        var params = new URLSearchParams();
+        params.set('action', 'vehicles');
+        params.set('location', preferences.location || '');
+        params.set('vehicle_type', preferences.vehicle_type || '');
+        params.set('start_date', preferences.start_date || '');
+        params.set('end_date', preferences.end_date || '');
+        params.set('seats', preferences.seats || '');
+        params.set('max_price', preferences.budget || '');
+        params.set('driver_preference', preferences.driver_preference || '');
+
+        return 'api.php?' + params.toString();
+    }
+
+    function chatbotDateText(preferences) {
+        if (preferences.start_date && preferences.end_date) {
+            return preferences.start_date + ' to ' + preferences.end_date;
+        }
+
+        return 'the selected dates';
+    }
+
+    function chatbotDailyPrice(vehicle, driverPreference) {
+        if (driverPreference === 'with_driver') {
+            return vehicle.with_driver_price;
+        }
+
+        return vehicle.self_drive_price;
+    }
+
+    function addAvailabilityCards(vehicles, preferences) {
+        var wrap = document.createElement('div');
+        wrap.className = 'chat-availability';
+
+        for (var i = 0; i < vehicles.length && i < 3; i++) {
+            var vehicle = vehicles[i];
+            var card = document.createElement('article');
+            card.className = 'chat-availability-card';
+            card.innerHTML = '' +
+                '<span class="availability-pill">Available now</span>' +
+                '<strong>' + chatbotEscape(vehicle.name) + '</strong>' +
+                '<span>' + chatbotEscape(vehicle.company_name) + ' | ' + chatbotEscape(vehicle.location) + '</span>' +
+                '<small>' + chatbotEscape(vehicle.category_name + ' - ' + vehicle.type_name) + '</small>' +
+                '<small>' + chatbotEscape((vehicle.seating_capacity || 'N/A') + ' seats | ' + chatbotMoney(chatbotDailyPrice(vehicle, preferences.driver_preference)) + ' per day') + '</small>' +
+                '<a class="btn small" href="vehicle.php?id=' + chatbotEscape(vehicle.id) + '">View vehicle</a>';
+            wrap.appendChild(card);
+        }
+
+        chatbotMessages.appendChild(wrap);
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+
     function addRecommendationCards(recommendations) {
         if (!recommendations.length) {
             addChatMessage('I could not find a matching available vehicle for those details. Try a wider budget, another date, or a broader location.', 'bot');
@@ -450,15 +502,44 @@ if (chatbotWidget) {
             });
 
             addChatMessage(preferences.message || 'Please recommend vehicles for my trip.', 'user');
-            addChatMessage('Checking vehicle filters and asking the AI consultant...', 'bot');
+            addChatMessage('Checking live vehicle availability...', 'bot');
 
-            fetch('api/consultant/index.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(preferences)
-            })
+            fetch(chatbotAvailabilityUrl(preferences))
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (json) {
+                    if (!json.success) {
+                        addChatMessage(json.message || 'Live availability could not be checked right now.', 'bot');
+                        return [];
+                    }
+
+                    var vehicles = json.data && json.data.vehicles ? json.data.vehicles : [];
+                    addChatMessage('Live availability: ' + vehicles.length + ' vehicle(s) found for ' + chatbotDateText(preferences) + '.', 'bot');
+
+                    if (vehicles.length > 0) {
+                        addAvailabilityCards(vehicles, preferences);
+                    } else {
+                        addChatMessage('No vehicles matched the live filters. Try another date, location, type, or budget.', 'bot');
+                    }
+
+                    return vehicles;
+                })
+                .catch(function () {
+                    addChatMessage('I could not reach the live availability API. I will still ask the AI consultant.', 'bot');
+                    return [];
+                })
+                .then(function () {
+                    addChatMessage('Asking AI consultant to explain the best matches...', 'bot');
+
+                    return fetch('api/consultant/index.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(preferences)
+                    });
+                })
                 .then(function (response) {
                     return response.json();
                 })

@@ -9,7 +9,7 @@
                 <button type="button" data-chatbot-close aria-label="Close chatbot">&times;</button>
             </div>
             <div class="chatbot-messages" data-chatbot-messages>
-                <div class="chat-message bot">Hi! I can recommend vehicles after checking budget, type, location, dates, seats, and driver preference.</div>
+                <div class="chat-message bot">Hi! I can check live availability first, then recommend vehicles by budget, type, location, dates, seats, and driver preference.</div>
             </div>
             <form class="chatbot-form" data-chatbot-form>
                 <label>
@@ -55,6 +55,6 @@
 <footer class="footer">
     <p>Hyrox Rental - Sprint 1</p>
 </footer>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/app.js')) ?>"></script>
 </body>
 </html>
