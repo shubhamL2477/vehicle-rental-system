@@ -390,6 +390,10 @@ if (chatbotWidget) {
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
 
+    function chatbotMoney(amount) {
+        return 'Rs. ' + Number(amount || 0).toFixed(2);
+    }
+
     function addRecommendationCards(recommendations) {
         if (!recommendations.length) {
             addChatMessage('I could not find a matching available vehicle for those details. Try a wider budget, another date, or a broader location.', 'bot');
@@ -407,6 +411,7 @@ if (chatbotWidget) {
                 '<strong>' + chatbotEscape(vehicle.name) + '</strong>' +
                 '<span>' + chatbotEscape(vehicle.company_name) + ' | ' + chatbotEscape(vehicle.location) + '</span>' +
                 '<small>' + chatbotEscape(vehicle.category_name + ' - ' + vehicle.type_name) + '</small>' +
+                '<small>' + chatbotEscape((vehicle.seating_capacity || 'N/A') + ' seats | ' + chatbotMoney(vehicle.daily_price) + ' per day') + '</small>' +
                 '<p>' + chatbotEscape(vehicle.explanation) + '</p>' +
                 '<a class="btn small" href="' + chatbotEscape(vehicle.url) + '">View vehicle</a>';
             wrap.appendChild(card);
@@ -445,17 +450,14 @@ if (chatbotWidget) {
             });
 
             addChatMessage(preferences.message || 'Please recommend vehicles for my trip.', 'user');
-            addChatMessage('Checking live vehicle availability...', 'bot');
+            addChatMessage('Checking vehicle filters and asking the AI consultant...', 'bot');
 
-            fetch('api.php?action=vehicle_consultant', {
+            fetch('api/consultant/index.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    message: preferences.message,
-                    preferences: preferences
-                })
+                body: JSON.stringify(preferences)
             })
                 .then(function (response) {
                     return response.json();
@@ -467,10 +469,10 @@ if (chatbotWidget) {
                     }
 
                     addChatMessage(json.data.answer, 'bot');
-                    if (json.data.consultant && json.data.consultant.note) {
-                        addChatMessage(json.data.consultant.note, 'bot');
+                    if (json.data.missing_fields && json.data.missing_fields.length) {
+                        addChatMessage('Missing: ' + json.data.missing_fields.join(', '), 'bot');
                     }
-                    addRecommendationCards(json.data.consultant ? json.data.consultant.recommendations : []);
+                    addRecommendationCards(json.data.recommendations || []);
                 })
                 .catch(function () {
                     addChatMessage('I could not reach the consultant API. Please try again.', 'bot');

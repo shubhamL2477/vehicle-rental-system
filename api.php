@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/backend/routes/api_common.php';
 require_once __DIR__ . '/backend/models/NotificationService.php';
+require_once __DIR__ . '/backend/models/VehicleConsultantModel.php';
 
 header('Content-Type: application/json');
 
@@ -113,14 +114,10 @@ if ($action === 'vehicles') {
 
 if ($action === 'vehicle_consultant') {
     try {
-        $message = trim((string) ($data['message'] ?? $_GET['message'] ?? ''));
-        $preferences = is_array($data['preferences'] ?? null) ? $data['preferences'] : $data;
-        $result = vehicle_consultant_recommendations($preferences);
+        $payload = $data ?: $_GET;
+        $result = VehicleConsultantModel::recommend($payload);
 
-        json_out(true, 'Vehicle consultant response ready.', [
-            'answer' => chatbot_public_answer($message),
-            'consultant' => $result,
-        ]);
+        json_out(true, 'Vehicle consultant response ready.', $result);
     } catch (Throwable $throwable) {
         db_log_error($throwable, 'api.php vehicle_consultant');
         json_out(false, 'Consultant could not load recommendations right now.', [], 500);

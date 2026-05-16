@@ -3,13 +3,13 @@
         <div class="chatbot-panel" data-chatbot-panel hidden>
             <div class="chatbot-head">
                 <div>
-                    <strong>Vehicle Consultant</strong>
-                    <span>Find available vehicles faster</span>
+                    <strong>AI Vehicle Consultant</strong>
+                    <span>Budget, type, location, dates, seats</span>
                 </div>
                 <button type="button" data-chatbot-close aria-label="Close chatbot">&times;</button>
             </div>
             <div class="chatbot-messages" data-chatbot-messages>
-                <div class="chat-message bot">Hi! Tell me your budget, vehicle type, location, rental dates, seats, and driver preference. I will check live availability.</div>
+                <div class="chat-message bot">Hi! I can recommend vehicles after checking budget, type, location, dates, seats, and driver preference.</div>
             </div>
             <form class="chatbot-form" data-chatbot-form>
                 <label>

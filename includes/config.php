@@ -2,6 +2,35 @@
 
 date_default_timezone_set('Asia/Kathmandu');
 
+function load_env_file($path)
+{
+    if (!is_file($path)) {
+        return;
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+
+        if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) {
+            continue;
+        }
+
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value, " \t\n\r\0\x0B\"'");
+
+        if ($key !== '' && (getenv($key) === false || getenv($key) === '')) {
+            putenv($key . '=' . $value);
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+        }
+    }
+}
+
+load_env_file(dirname(__DIR__) . '/.env');
+
 function env_value($key, $default = '')
 {
     $value = getenv($key);
@@ -37,6 +66,11 @@ define('STRIPE_SECRET_KEY', env_value('STRIPE_SECRET_KEY', ''));
 define('STRIPE_WEBHOOK_SECRET', env_value('STRIPE_WEBHOOK_SECRET', ''));
 define('STRIPE_CURRENCY', strtolower(env_value('STRIPE_CURRENCY', 'npr')));
 define('STRIPE_API_VERSION', env_value('STRIPE_API_VERSION', '2026-02-25.clover'));
+
+define('AI_CONSULTANT_NAME', env_value('AI_CONSULTANT_NAME', 'VehicleRentalConsultant'));
+define('GROQ_API_KEY', env_value('GROQ_API_KEY', ''));
+define('GROQ_MODEL', env_value('GROQ_MODEL', 'llama-3.1-8b-instant'));
+define('GROQ_API_URL', env_value('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions'));
 
 define('OTP_EXPIRE_MINUTES', 5);
 define('OTP_RESEND_SECONDS', 60);

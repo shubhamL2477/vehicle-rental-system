@@ -266,6 +266,64 @@ function available_vehicle_options($excludeVehicleId = 0)
     );
 }
 
+function db_table_exists($table)
+{
+    static $cache = [];
+    $table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $table);
+
+    if ($table === '') {
+        return false;
+    }
+
+    if (!array_key_exists($table, $cache)) {
+        try {
+            $cache[$table] = db_value('SHOW TABLES LIKE ?', [$table]) !== null;
+        } catch (Throwable $throwable) {
+            $cache[$table] = false;
+        }
+    }
+
+    return $cache[$table];
+}
+
+function db_column_exists($table, $column)
+{
+    static $cache = [];
+    $table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $table);
+    $column = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $column);
+    $key = $table . '.' . $column;
+
+    if ($table === '' || $column === '') {
+        return false;
+    }
+
+    if (!array_key_exists($key, $cache)) {
+        try {
+            $cache[$key] = db_one('SHOW COLUMNS FROM `' . $table . '` LIKE ?', [$column]) !== null;
+        } catch (Throwable $throwable) {
+            $cache[$key] = false;
+        }
+    }
+
+    return $cache[$key];
+}
+
+function vehicle_company_sql_parts()
+{
+    if (db_table_exists('companies') && db_column_exists('companies', 'owner_user_id')) {
+        return [
+            'join_sql' => 'JOIN companies company ON company.id = v.company_id
+                           LEFT JOIN users company_owner ON company_owner.id = company.owner_user_id',
+            'name_sql' => 'COALESCE(NULLIF(company.name, ""), company_owner.name, CONCAT("Company #", company.id))',
+        ];
+    }
+
+    return [
+        'join_sql' => 'JOIN users company_user ON company_user.id = v.company_id',
+        'name_sql' => 'COALESCE(NULLIF(company_user.company_name, ""), company_user.name)',
+    ];
+}
+
 function vehicle_filter_options($input)
 {
     $search = trim((string) ($input['search'] ?? $input['location'] ?? ''));
@@ -278,6 +336,7 @@ function vehicle_filter_options($input)
     $driverPreference = trim((string) ($input['driver_preference'] ?? ''));
     $minPrice = (float) ($input['min_price'] ?? 0);
     $maxPrice = (float) ($input['max_price'] ?? $input['budget'] ?? 0);
+    $seats = (int) ($input['seats'] ?? 0);
 
     if ($typeId < 1 && $typeName !== '') {
         $type = db_one('SELECT id, category_id FROM vehicle_types WHERE LOWER(name) LIKE LOWER(?) LIMIT 1', ['%' . $typeName . '%']);
@@ -296,6 +355,7 @@ function vehicle_filter_options($input)
         'type_id' => $typeId,
         'min_price' => max(0, $minPrice),
         'max_price' => max(0, $maxPrice),
+        'seats' => max(0, $seats),
         'driver_preference' => in_array($driverPreference, ['self_drive', 'with_driver'], true) ? $driverPreference : '',
     ];
 }
@@ -306,6 +366,7 @@ function vehicle_filter_sql($filters)
     $where = 'WHERE v.status = "available"';
     $startDate = $filters['start_date'];
     $endDate = $filters['end_date'];
+    $companySql = vehicle_company_sql_parts();
 
     if ($startDate !== '' && $endDate !== '' && strtotime($endDate) >= strtotime($startDate)) {
         $where .= ' AND NOT EXISTS (
@@ -348,7 +409,7 @@ function vehicle_filter_sql($filters)
     }
 
     if ($filters['search'] !== '') {
-        $where .= ' AND (v.name LIKE ? OR COALESCE(NULLIF(u.company_name, ""), u.name) LIKE ? OR v.location LIKE ?)';
+        $where .= ' AND (v.name LIKE ? OR ' . $companySql['name_sql'] . ' LIKE ? OR v.location LIKE ?)';
         $params[] = '%' . $filters['search'] . '%';
         $params[] = '%' . $filters['search'] . '%';
         $params[] = '%' . $filters['search'] . '%';
@@ -369,6 +430,10 @@ function vehicle_filter_sql($filters)
         $params[] = $filters['type_id'];
     }
 
+    if ($filters['driver_preference'] === 'with_driver') {
+        $where .= ' AND v.with_driver_price > 0';
+    }
+
     if ($filters['min_price'] > 0) {
         $where .= ' AND v.self_drive_price >= ?';
         $params[] = $filters['min_price'];
@@ -380,6 +445,11 @@ function vehicle_filter_sql($filters)
         $params[] = $filters['max_price'];
     }
 
+    if (($filters['seats'] ?? 0) > 0 && db_column_exists('vehicles', 'seating_capacity')) {
+        $where .= ' AND v.seating_capacity >= ?';
+        $params[] = (int) $filters['seats'];
+    }
+
     return [$where, $params];
 }
 
@@ -388,17 +458,20 @@ function filtered_vehicles($input, $limit = 50)
     $filters = vehicle_filter_options($input);
     [$where, $params] = vehicle_filter_sql($filters);
     $limit = max(1, min(100, (int) $limit));
+    $companySql = vehicle_company_sql_parts();
+    $seatSql = db_column_exists('vehicles', 'seating_capacity') ? 'v.seating_capacity' : 'NULL';
 
     $vehicles = db_all(
         'SELECT v.id, v.company_id, v.category_id, v.type_id, v.name, v.location,
                 v.self_drive_price, v.with_driver_price, v.description, v.status,
                 v.latitude, v.longitude, v.image, v.created_at,
-                COALESCE(NULLIF(u.company_name, ""), u.name) AS company_name,
+                ' . $seatSql . ' AS seating_capacity,
+                ' . $companySql['name_sql'] . ' AS company_name,
                 c.name AS category_name, t.name AS type_name,
                 (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE vehicle_id = v.id AND status = "published") AS average_rating,
                 (SELECT COUNT(*) FROM reviews WHERE vehicle_id = v.id AND status = "published") AS review_count
          FROM vehicles v
-         JOIN users u ON u.id = v.company_id
+         ' . $companySql['join_sql'] . '
          JOIN vehicle_categories c ON c.id = v.category_id
          JOIN vehicle_types t ON t.id = v.type_id
          ' . $where . '
@@ -408,93 +481,6 @@ function filtered_vehicles($input, $limit = 50)
     );
 
     return [$vehicles, $filters];
-}
-
-function vehicle_consultant_recommendations($input)
-{
-    [$vehicles, $filters] = filtered_vehicles($input, 12);
-    $driverPreference = $filters['driver_preference'] === 'with_driver' ? 'with_driver' : 'self_drive';
-    $budget = (float) ($input['budget'] ?? $filters['max_price'] ?? 0);
-    $recommendations = [];
-
-    foreach ($vehicles as $vehicle) {
-        $price = $driverPreference === 'with_driver' ? (float) $vehicle['with_driver_price'] : (float) $vehicle['self_drive_price'];
-        $reasons = [];
-        $reasons[] = 'Matches available vehicle filters for the selected dates.';
-
-        if ($filters['location'] !== '' && stripos($vehicle['location'], $filters['location']) !== false) {
-            $reasons[] = 'Location matches ' . $vehicle['location'] . '.';
-        }
-
-        if ($budget > 0 && $price <= $budget) {
-            $reasons[] = 'Fits the daily budget at ' . money($price) . '.';
-        }
-
-        if ($filters['driver_preference'] === 'with_driver') {
-            $reasons[] = 'Supports booking with driver.';
-        } else {
-            $reasons[] = 'Good self-drive option.';
-        }
-
-        if ((int) ($vehicle['review_count'] ?? 0) > 0) {
-            $reasons[] = rating_text($vehicle['average_rating'], $vehicle['review_count']) . '.';
-        }
-
-        $recommendations[] = [
-            'id' => (int) $vehicle['id'],
-            'name' => (string) $vehicle['name'],
-            'company_name' => (string) $vehicle['company_name'],
-            'location' => (string) $vehicle['location'],
-            'category_name' => (string) $vehicle['category_name'],
-            'type_name' => (string) $vehicle['type_name'],
-            'self_drive_price' => (float) $vehicle['self_drive_price'],
-            'with_driver_price' => (float) $vehicle['with_driver_price'],
-            'image' => vehicle_image_src($vehicle['image'] ?? ''),
-            'url' => 'vehicle.php?id=' . (int) $vehicle['id'],
-            'explanation' => implode(' ', $reasons),
-        ];
-
-        if (count($recommendations) >= 5) {
-            break;
-        }
-    }
-
-    return [
-        'questions' => [
-            'What is your daily budget?',
-            'Which vehicle type do you prefer?',
-            'Which location should I search near?',
-            'What rental start and end dates do you need?',
-            'How many seats do you need?',
-            'Do you prefer self-drive or with driver?',
-        ],
-        'filters' => $filters,
-        'recommendations' => $recommendations,
-        'note' => 'Recommendations use public vehicle data and live availability only. Seat count is collected for advice, but this database currently has no seat-capacity field.',
-    ];
-}
-
-function chatbot_public_answer($message)
-{
-    $message = strtolower(trim((string) $message));
-
-    if ($message === '') {
-        return 'Tell me your budget, vehicle type, location, rental dates, seats, and driver preference. I can then recommend matching vehicles.';
-    }
-
-    if (strpos($message, 'payment') !== false || strpos($message, 'stripe') !== false || strpos($message, 'cash') !== false) {
-        return 'You can choose cash due after approval or Stripe Checkout when booking. Payment status is shown on the payment status page.';
-    }
-
-    if (strpos($message, 'book') !== false || strpos($message, 'date') !== false || strpos($message, 'available') !== false) {
-        return 'Vehicle availability is checked against confirmed bookings, pending requests, maintenance records, and manual blocked dates before submission.';
-    }
-
-    if (strpos($message, 'account') !== false || strpos($message, 'login') !== false || strpos($message, 'register') !== false) {
-        return 'Create a user account, verify OTP, then login to submit bookings and manage your requests from the dashboard.';
-    }
-
-    return 'I can help with vehicle recommendations, booking steps, payment status, and account questions. For recommendations, fill in the quick fields below.';
 }
 
 function payment_for_booking($bookingId)
