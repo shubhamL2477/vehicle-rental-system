@@ -373,6 +373,7 @@ if (chatbotWidget) {
     var chatbotClose = chatbotWidget.querySelector('[data-chatbot-close]');
     var chatbotForm = chatbotWidget.querySelector('[data-chatbot-form]');
     var chatbotMessages = chatbotWidget.querySelector('[data-chatbot-messages]');
+    var currentChatPreferences = {};
 
     function chatbotEscape(text) {
         return String(text || '')
@@ -390,9 +391,78 @@ if (chatbotWidget) {
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
 
+    function clearChatMessages() {
+        chatbotMessages.innerHTML = '';
+    }
+
+    function addChatIntro() {
+        addChatMessage('Tell me your budget, vehicle type, location, dates, seats, and driver option. I will recommend matching vehicles.', 'bot');
+    }
+
+    function setChatbotFormCollapsed(collapsed) {
+        if (chatbotPanel) {
+            chatbotPanel.classList.toggle('has-results', collapsed);
+        }
+        if (chatbotForm) {
+            chatbotForm.hidden = collapsed;
+        }
+    }
+
+    function addSearchAgainButton() {
+        var actions = document.createElement('div');
+        var button = document.createElement('button');
+
+        actions.className = 'chatbot-result-actions';
+        button.type = 'button';
+        button.className = 'btn light small';
+        button.textContent = 'Search again';
+        button.onclick = function () {
+            clearChatMessages();
+            addChatIntro();
+            setChatbotFormCollapsed(false);
+            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        };
+
+        actions.appendChild(button);
+        chatbotMessages.appendChild(actions);
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+
+    function chatbotMoney(amount) {
+        return 'Rs. ' + Number(amount || 0).toFixed(2) + '/day';
+    }
+
+    function chatFormLooksValid(preferences) {
+        var budget = Number(preferences.budget || 0);
+        var seats = Number(preferences.seats || 0);
+
+        if (!preferences.vehicle_type || !preferences.location || !preferences.start_date || !preferences.end_date) {
+            addChatMessage('Please fill vehicle type, location, start date, and end date.', 'bot');
+            return false;
+        }
+
+        if (!budget || budget < 1) {
+            addChatMessage('Please enter a valid daily budget.', 'bot');
+            return false;
+        }
+
+        if (!seats || seats < 1) {
+            addChatMessage('Please enter the number of seats you need.', 'bot');
+            return false;
+        }
+
+        if (preferences.end_date < preferences.start_date) {
+            addChatMessage('End date must be the same day or after the start date.', 'bot');
+            return false;
+        }
+
+        return true;
+    }
+
     function addRecommendationCards(recommendations) {
         if (!recommendations.length) {
             addChatMessage('I could not find a matching available vehicle for those details. Try a wider budget, another date, or a broader location.', 'bot');
+            addSearchAgainButton();
             return;
         }
 
@@ -401,18 +471,36 @@ if (chatbotWidget) {
 
         for (var i = 0; i < recommendations.length; i++) {
             var vehicle = recommendations[i];
+            var driverPreference = currentChatPreferences.driver_preference === 'with_driver' ? 'with_driver' : 'self_drive';
+            var dailyPrice = driverPreference === 'with_driver' ? vehicle.with_driver_price : vehicle.self_drive_price;
+            var seats = currentChatPreferences.seats || 'Requested';
+            var image = vehicle.image
+                ? '<img src="' + chatbotEscape(vehicle.image) + '" alt="">'
+                : '<div class="chat-rec-placeholder">No image</div>';
             var card = document.createElement('article');
             card.className = 'chat-recommendation';
             card.innerHTML = '' +
-                '<strong>' + chatbotEscape(vehicle.name) + '</strong>' +
-                '<span>' + chatbotEscape(vehicle.company_name) + ' | ' + chatbotEscape(vehicle.location) + '</span>' +
-                '<small>' + chatbotEscape(vehicle.category_name + ' - ' + vehicle.type_name) + '</small>' +
-                '<p>' + chatbotEscape(vehicle.explanation) + '</p>' +
-                '<a class="btn small" href="' + chatbotEscape(vehicle.url) + '">View vehicle</a>';
+                '<div class="chat-rec-image">' + image + '</div>' +
+                '<div class="chat-rec-content">' +
+                    '<strong>' + chatbotEscape(vehicle.name) + '</strong>' +
+                    '<span>' + chatbotEscape(vehicle.company_name) + ' | ' + chatbotEscape(vehicle.location) + '</span>' +
+                    '<small>' + chatbotEscape(vehicle.category_name + ' - ' + vehicle.type_name) + '</small>' +
+                    '<div class="chat-rec-specs">' +
+                        '<span><b>Seats</b>' + chatbotEscape(seats) + '</span>' +
+                        '<span><b>Budget</b>' + chatbotEscape(chatbotMoney(dailyPrice)) + '</span>' +
+                        '<span><b>Location</b>' + chatbotEscape(vehicle.location) + '</span>' +
+                    '</div>' +
+                    '<p>' + chatbotEscape(vehicle.explanation) + '</p>' +
+                    '<div class="chat-rec-actions">' +
+                        '<a class="btn small" href="' + chatbotEscape(vehicle.url + '#book') + '">Book Now</a>' +
+                        '<a class="btn light small" href="' + chatbotEscape(vehicle.url) + '">Details</a>' +
+                    '</div>' +
+                '</div>';
             wrap.appendChild(card);
         }
 
         chatbotMessages.appendChild(wrap);
+        addSearchAgainButton();
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
 
@@ -421,6 +509,13 @@ if (chatbotWidget) {
             chatbotPanel.hidden = !open;
         }
     }
+
+    chatbotWidget.addEventListener('click', function (event) {
+        if (event.target.closest('[data-chatbot-close]')) {
+            event.preventDefault();
+            setChatbotOpen(false);
+        }
+    });
 
     if (chatbotToggle) {
         chatbotToggle.onclick = function () {
@@ -438,12 +533,24 @@ if (chatbotWidget) {
         chatbotForm.onsubmit = function (event) {
             event.preventDefault();
 
+            if (!chatbotForm.checkValidity()) {
+                chatbotForm.reportValidity();
+                return;
+            }
+
             var formData = new FormData(chatbotForm);
             var preferences = {};
             formData.forEach(function (value, key) {
                 preferences[key] = value;
             });
+            currentChatPreferences = preferences;
 
+            clearChatMessages();
+            if (!chatFormLooksValid(preferences)) {
+                return;
+            }
+
+            setChatbotFormCollapsed(true);
             addChatMessage(preferences.message || 'Please recommend vehicles for my trip.', 'user');
             addChatMessage('Checking live vehicle availability...', 'bot');
 
@@ -463,6 +570,7 @@ if (chatbotWidget) {
                 .then(function (json) {
                     if (!json.success) {
                         addChatMessage(json.message || 'Consultant is unavailable right now.', 'bot');
+                        addSearchAgainButton();
                         return;
                     }
 
@@ -474,6 +582,7 @@ if (chatbotWidget) {
                 })
                 .catch(function () {
                     addChatMessage('I could not reach the consultant API. Please try again.', 'bot');
+                    addSearchAgainButton();
                 });
         };
     }

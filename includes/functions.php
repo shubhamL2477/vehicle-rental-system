@@ -284,6 +284,11 @@ function vehicle_filter_options($input)
         if ($type) {
             $typeId = (int) $type['id'];
             $categoryId = $categoryId > 0 ? $categoryId : (int) $type['category_id'];
+        } else {
+            $category = db_one('SELECT id FROM vehicle_categories WHERE LOWER(name) LIKE LOWER(?) LIMIT 1', ['%' . $typeName . '%']);
+            if ($category) {
+                $categoryId = (int) $category['id'];
+            }
         }
     }
 
@@ -410,9 +415,51 @@ function filtered_vehicles($input, $limit = 50)
     return [$vehicles, $filters];
 }
 
-function vehicle_consultant_recommendations($input)
+function vehicle_consultant_questions()
 {
-    [$vehicles, $filters] = filtered_vehicles($input, 12);
+    return [
+        'What is your daily budget?',
+        'Which vehicle type do you prefer?',
+        'Which location should I search near?',
+        'What rental start and end dates do you need?',
+        'How many seats do you need?',
+        'Do you prefer self-drive or with driver?',
+    ];
+}
+
+function vehicle_consultant_missing_fields($input, $filters)
+{
+    $missing = [];
+
+    if ((float) ($input['budget'] ?? $filters['max_price'] ?? 0) <= 0) {
+        $missing[] = 'budget';
+    }
+
+    if (trim((string) ($input['vehicle_type'] ?? $input['type'] ?? '')) === '' && (int) ($filters['category_id'] ?? 0) < 1 && (int) ($filters['type_id'] ?? 0) < 1) {
+        $missing[] = 'vehicle type';
+    }
+
+    if (($filters['location'] ?? '') === '') {
+        $missing[] = 'location';
+    }
+
+    if (($filters['start_date'] ?? '') === '' || ($filters['end_date'] ?? '') === '') {
+        $missing[] = 'dates';
+    }
+
+    if ((int) ($input['seats'] ?? 0) < 1) {
+        $missing[] = 'seat count';
+    }
+
+    if (($filters['driver_preference'] ?? '') === '') {
+        $missing[] = 'driver preference';
+    }
+
+    return $missing;
+}
+
+function vehicle_consultant_local_recommendations($vehicles, $filters, $input)
+{
     $driverPreference = $filters['driver_preference'] === 'with_driver' ? 'with_driver' : 'self_drive';
     $budget = (float) ($input['budget'] ?? $filters['max_price'] ?? 0);
     $recommendations = [];
@@ -430,7 +477,7 @@ function vehicle_consultant_recommendations($input)
             $reasons[] = 'Fits the daily budget at ' . money($price) . '.';
         }
 
-        if ($filters['driver_preference'] === 'with_driver') {
+        if ($driverPreference === 'with_driver') {
             $reasons[] = 'Supports booking with driver.';
         } else {
             $reasons[] = 'Good self-drive option.';
@@ -459,42 +506,179 @@ function vehicle_consultant_recommendations($input)
         }
     }
 
-    return [
-        'questions' => [
-            'What is your daily budget?',
-            'Which vehicle type do you prefer?',
-            'Which location should I search near?',
-            'What rental start and end dates do you need?',
-            'How many seats do you need?',
-            'Do you prefer self-drive or with driver?',
-        ],
-        'filters' => $filters,
-        'recommendations' => $recommendations,
-        'note' => 'Recommendations use public vehicle data and live availability only. Seat count is collected for advice, but this database currently has no seat-capacity field.',
-    ];
+    return $recommendations;
 }
 
-function chatbot_public_answer($message)
+function vehicle_consultant_fallback_answer($recommendations, $missingFields)
 {
-    $message = strtolower(trim((string) $message));
-
-    if ($message === '') {
-        return 'Tell me your budget, vehicle type, location, rental dates, seats, and driver preference. I can then recommend matching vehicles.';
+    if ($missingFields) {
+        return 'I can recommend better matches if you also share: ' . implode(', ', $missingFields) . '. I still checked the available vehicle list with the details you entered.';
     }
 
-    if (strpos($message, 'payment') !== false || strpos($message, 'stripe') !== false || strpos($message, 'cash') !== false) {
-        return 'You can choose cash due after approval or Stripe Checkout when booking. Payment status is shown on the payment status page.';
+    if (!$recommendations) {
+        return 'I could not find a matching available vehicle for those details. Try a wider budget, nearby location, different vehicle type, or another date range.';
     }
 
-    if (strpos($message, 'book') !== false || strpos($message, 'date') !== false || strpos($message, 'available') !== false) {
-        return 'Vehicle availability is checked against confirmed bookings, pending requests, maintenance records, and manual blocked dates before submission.';
+    return 'I found ' . count($recommendations) . ' available vehicle match(es). The top options below are ranked by your budget, location, dates, and driver preference.';
+}
+
+function ai_json_from_text($text)
+{
+    $text = trim((string) $text);
+    $decoded = json_decode($text, true);
+
+    if (is_array($decoded)) {
+        return $decoded;
     }
 
-    if (strpos($message, 'account') !== false || strpos($message, 'login') !== false || strpos($message, 'register') !== false) {
-        return 'Create a user account, verify OTP, then login to submit bookings and manage your requests from the dashboard.';
+    $start = strpos($text, '{');
+    $end = strrpos($text, '}');
+
+    if ($start === false || $end === false || $end <= $start) {
+        return null;
     }
 
-    return 'I can help with vehicle recommendations, booking steps, payment status, and account questions. For recommendations, fill in the quick fields below.';
+    $decoded = json_decode(substr($text, $start, $end - $start + 1), true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+function groq_chat_json($messages)
+{
+    if (GROQ_API_KEY === '' || !function_exists('curl_init')) {
+        return null;
+    }
+
+    $payload = [
+        'model' => GROQ_MODEL,
+        'messages' => $messages,
+        'temperature' => 0.3,
+        'max_completion_tokens' => 700,
+    ];
+
+    $curl = curl_init(GROQ_API_URL);
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . GROQ_API_KEY,
+            'Content-Type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_TIMEOUT => 15,
+    ]);
+
+    $response = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false || $status >= 400) {
+        db_log_error(new RuntimeException('Groq API request failed: HTTP ' . $status . ' ' . $error), 'groq_chat_json');
+        return null;
+    }
+
+    $json = json_decode($response, true);
+    $content = $json['choices'][0]['message']['content'] ?? '';
+
+    return ai_json_from_text($content);
+}
+
+function vehicle_consultant_ai_response($input, $filters, $recommendations, $missingFields)
+{
+    $vehiclesForPrompt = array_map(function ($vehicle) use ($filters) {
+        $driverPreference = $filters['driver_preference'] === 'with_driver' ? 'with_driver' : 'self_drive';
+        $price = $driverPreference === 'with_driver' ? $vehicle['with_driver_price'] : $vehicle['self_drive_price'];
+
+        return [
+            'id' => $vehicle['id'],
+            'name' => $vehicle['name'],
+            'company_name' => $vehicle['company_name'],
+            'location' => $vehicle['location'],
+            'type' => trim($vehicle['category_name'] . ' ' . $vehicle['type_name']),
+            'daily_price' => $price,
+            'rating' => rating_text($vehicle['average_rating'] ?? 0, $vehicle['review_count'] ?? 0),
+            'local_explanation' => $vehicle['explanation'],
+        ];
+    }, $recommendations);
+
+    $messages = [
+        [
+            'role' => 'system',
+            'content' => 'You are Hyrox Rental vehicle consulting agent. Use only the provided vehicle data. Do not invent vehicles, prices, dates, or availability. If details are missing, ask for them clearly. Return only JSON with keys: answer, note, recommendations. recommendations must be an array of objects with id and explanation.',
+        ],
+        [
+            'role' => 'user',
+            'content' => json_encode([
+                'customer_message' => (string) ($input['message'] ?? ''),
+                'preferences' => [
+                    'budget' => $input['budget'] ?? '',
+                    'vehicle_type' => $input['vehicle_type'] ?? ($input['type'] ?? ''),
+                    'location' => $input['location'] ?? '',
+                    'start_date' => $input['start_date'] ?? '',
+                    'end_date' => $input['end_date'] ?? '',
+                    'seats' => $input['seats'] ?? '',
+                    'driver_preference' => $input['driver_preference'] ?? '',
+                ],
+                'filters_used' => $filters,
+                'missing_fields' => $missingFields,
+                'available_vehicle_matches' => $vehiclesForPrompt,
+            ]),
+        ],
+    ];
+
+    return groq_chat_json($messages);
+}
+
+function vehicle_consultant_recommendations($input)
+{
+    [$vehicles, $filters] = filtered_vehicles($input, 12);
+    $missingFields = vehicle_consultant_missing_fields($input, $filters);
+    $recommendations = vehicle_consultant_local_recommendations($vehicles, $filters, $input);
+    $answer = vehicle_consultant_fallback_answer($recommendations, $missingFields);
+    $note = 'Recommendations use the vehicle filter API and live availability. Seat count is collected for advice, but this database currently has no seat-capacity field.';
+    $aiUsed = false;
+
+    $ai = vehicle_consultant_ai_response($input, $filters, $recommendations, $missingFields);
+
+    if (is_array($ai)) {
+        if (!empty($ai['answer']) && is_string($ai['answer'])) {
+            $answer = trim($ai['answer']);
+            $aiUsed = true;
+        }
+
+        if (!empty($ai['note']) && is_string($ai['note'])) {
+            $note = trim($ai['note']);
+        }
+
+        if (!empty($ai['recommendations']) && is_array($ai['recommendations'])) {
+            $aiExplanations = [];
+            foreach ($ai['recommendations'] as $item) {
+                if (isset($item['id'], $item['explanation'])) {
+                    $aiExplanations[(int) $item['id']] = trim((string) $item['explanation']);
+                }
+            }
+
+            foreach ($recommendations as &$recommendation) {
+                if (isset($aiExplanations[$recommendation['id']]) && $aiExplanations[$recommendation['id']] !== '') {
+                    $recommendation['explanation'] = $aiExplanations[$recommendation['id']];
+                    $aiUsed = true;
+                }
+            }
+            unset($recommendation);
+        }
+    }
+
+    return [
+        'questions' => vehicle_consultant_questions(),
+        'filters' => $filters,
+        'missing_fields' => $missingFields,
+        'recommendations' => $recommendations,
+        'answer' => $answer,
+        'note' => $note,
+        'ai_provider' => $aiUsed ? 'Groq' : 'Local fallback',
+        'ai_model' => GROQ_MODEL,
+        'ai_used' => $aiUsed,
+    ];
 }
 
 function payment_for_booking($bookingId)

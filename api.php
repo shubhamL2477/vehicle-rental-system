@@ -115,10 +115,11 @@ if ($action === 'vehicle_consultant') {
     try {
         $message = trim((string) ($data['message'] ?? $_GET['message'] ?? ''));
         $preferences = is_array($data['preferences'] ?? null) ? $data['preferences'] : $data;
+        $preferences['message'] = $message;
         $result = vehicle_consultant_recommendations($preferences);
 
         json_out(true, 'Vehicle consultant response ready.', [
-            'answer' => chatbot_public_answer($message),
+            'answer' => $result['answer'],
             'consultant' => $result,
         ]);
     } catch (Throwable $throwable) {

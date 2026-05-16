@@ -12,7 +12,7 @@ $unreadNotifications = $me ? NotificationService::unreadCount((int) $me['id']) :
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($pageTitle) ?> - <?= APP_NAME ?></title>
     <base href="<?= e(APP_PUBLIC_URL) ?>/">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 </head>
 <body>
 <header class="topbar">

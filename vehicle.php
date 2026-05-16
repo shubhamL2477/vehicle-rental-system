@@ -57,7 +57,7 @@ require __DIR__ . '/includes/header.php';
     </div>
 </section>
 
-<section class="grid two">
+<section class="grid two" id="book">
     <div class="box">
         <h2>Book this vehicle</h2>
         <?php if (!$me): ?>

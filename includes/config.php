@@ -2,6 +2,32 @@
 
 date_default_timezone_set('Asia/Kathmandu');
 
+function load_env_file($path)
+{
+    if (!is_file($path)) {
+        return;
+    }
+
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+
+        if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) {
+            continue;
+        }
+
+        [$key, $value] = array_map('trim', explode('=', $line, 2));
+        $value = trim($value, "\"'");
+
+        if ($key !== '' && getenv($key) === false) {
+            putenv($key . '=' . $value);
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+        }
+    }
+}
+
+load_env_file(dirname(__DIR__) . '/.env');
+
 function env_value($key, $default = '')
 {
     $value = getenv($key);
@@ -16,7 +42,7 @@ function env_value($key, $default = '')
 define('APP_NAME', 'Hyrox Rental');
 define('APP_TAGLINE', 'Reserve verified vehicles across trusted companies.');
 define('APP_ROOT', dirname(__DIR__));
-define('APP_PUBLIC_URL', rtrim(env_value('APP_PUBLIC_URL', 'http://localhost/vehicle-rental-system'), '/'));
+define('APP_PUBLIC_URL', rtrim(env_value('APP_PUBLIC_URL', 'http://localhost/vehicle-rental-system-clean'), '/'));
 
 define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'vehicle_rental');
@@ -37,6 +63,10 @@ define('STRIPE_SECRET_KEY', env_value('STRIPE_SECRET_KEY', ''));
 define('STRIPE_WEBHOOK_SECRET', env_value('STRIPE_WEBHOOK_SECRET', ''));
 define('STRIPE_CURRENCY', strtolower(env_value('STRIPE_CURRENCY', 'npr')));
 define('STRIPE_API_VERSION', env_value('STRIPE_API_VERSION', '2026-02-25.clover'));
+
+define('GROQ_API_KEY', env_value('GROQ_API_KEY', ''));
+define('GROQ_MODEL', env_value('GROQ_MODEL', 'llama-3.1-8b-instant'));
+define('GROQ_API_URL', env_value('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions'));
 
 define('OTP_EXPIRE_MINUTES', 5);
 define('OTP_RESEND_SECONDS', 60);
