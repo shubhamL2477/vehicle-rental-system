@@ -12,6 +12,50 @@ function pending_company_request($companyId, $type)
     );
 }
 
+function auth_user_status($preferred, $fallback)
+{
+    return db_enum_allows('users', 'status', $preferred) ? $preferred : $fallback;
+}
+
+function auth_insert_user($data)
+{
+    $columns = array_keys($data);
+    $placeholders = array_fill(0, count($columns), '?');
+
+    db_run(
+        'INSERT INTO users (`' . implode('`, `', $columns) . '`) VALUES (' . implode(', ', $placeholders) . ')',
+        array_values($data)
+    );
+}
+
+function ensure_company_profile_for_user($user)
+{
+    if (!$user || !company_table_enabled()) {
+        return 0;
+    }
+
+    $existing = company_id_for_owner_user((int) $user['id']);
+    if ($existing > 0) {
+        db_run('UPDATE companies SET status = "approved" WHERE id = ?', [$existing]);
+        return $existing;
+    }
+
+    db_run(
+        'INSERT INTO companies (owner_user_id, name, description, address, contact_email, contact_phone, status)
+         VALUES (?, ?, ?, ?, ?, ?, "approved")',
+        [
+            (int) $user['id'],
+            $user['company_name'] ?: $user['name'],
+            null,
+            $user['address'] ?: '',
+            $user['email'],
+            $user['phone'],
+        ]
+    );
+
+    return (int) db()->lastInsertId();
+}
+
 if ($action === 'register') {
     $role = $_POST['role'] ?? 'user';
     $name = trim($_POST['name'] ?? '');
@@ -57,19 +101,21 @@ if ($action === 'register') {
         go('../register.php');
     }
 
-    db_run(
-        'INSERT INTO users (role_id, name, email, phone, password, company_name, address)
-         VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [
-            role_id($role),
-            $name,
-            $email,
-            $phone,
-            password_hash($password, PASSWORD_DEFAULT),
-            $role === 'company' ? $companyName : null,
-            $address
-        ]
-    );
+    $userData = [
+        'role_id' => role_id($role),
+        'name' => $name,
+        'email' => $email,
+        'phone' => $phone,
+        'password' => password_hash($password, PASSWORD_DEFAULT),
+        'company_name' => $role === 'company' ? $companyName : null,
+        'address' => $address,
+    ];
+
+    if (db_column_exists('users', 'role')) {
+        $userData['role'] = $role;
+    }
+
+    auth_insert_user($userData);
 
     $userId = (int) db()->lastInsertId();
     $otp = create_otp($userId, 'verify');
@@ -150,7 +196,7 @@ if ($action === 'verify_otp') {
     }
 
     if ($user['role_name'] === 'company') {
-        db_run('UPDATE users SET is_verified = 1, status = "pending_admin" WHERE id = ?', [$userId]);
+        db_run('UPDATE users SET is_verified = 1, status = ? WHERE id = ?', [auth_user_status('pending_admin', 'pending'), $userId]);
 
         if (!pending_company_request($userId, 'create')) {
             db_run(
@@ -169,7 +215,7 @@ if ($action === 'verify_otp') {
         go('../login.php');
     }
 
-    db_run('UPDATE users SET is_verified = 1, status = "active" WHERE id = ?', [$userId]);
+    db_run('UPDATE users SET is_verified = 1, status = ? WHERE id = ?', [auth_user_status('active', 'active'), $userId]);
     unset($_SESSION['verify_user_id']);
     flash('Account verified. You can login now.', 'success');
     go('../login.php');
@@ -255,11 +301,22 @@ if ($action === 'add_agent') {
         go('../dashboard.php');
     }
 
-    db_run(
-        'INSERT INTO users (role_id, company_id, name, email, phone, password, status, is_verified)
-         VALUES (?, ?, ?, ?, ?, ?, "active", 1)',
-        [role_id('agent'), $me['id'], $name, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]
-    );
+    $agentData = [
+        'role_id' => role_id('agent'),
+        'company_id' => managed_company_id($me),
+        'name' => $name,
+        'email' => $email,
+        'phone' => $phone,
+        'password' => password_hash($password, PASSWORD_DEFAULT),
+        'status' => auth_user_status('active', 'active'),
+        'is_verified' => 1,
+    ];
+
+    if (db_column_exists('users', 'role')) {
+        $agentData['role'] = 'agent';
+    }
+
+    auth_insert_user($agentData);
 
     flash('Agent account created.', 'success');
     go('../dashboard.php');
@@ -338,7 +395,7 @@ if ($action === 'edit_agent') {
 
     db_run(
         'UPDATE users SET name = ?, phone = ? WHERE id = ? AND company_id = ?',
-        [$name, $phone, $agentId, $me['id']]
+        [$name, $phone, $agentId, managed_company_id($me)]
     );
 
     flash('Agent updated.', 'success');
@@ -350,7 +407,7 @@ if ($action === 'delete_agent') {
     $me = current_user();
     $agentId = (int) ($_POST['agent_id'] ?? 0);
 
-    db_run('DELETE FROM users WHERE id = ? AND company_id = ?', [$agentId, $me['id']]);
+    db_run('DELETE FROM users WHERE id = ? AND company_id = ?', [$agentId, managed_company_id($me)]);
     flash('Agent deleted.', 'success');
     go('../dashboard.php');
 }
@@ -381,7 +438,8 @@ if ($action === 'review_company_request') {
 
     if ($decision === 'approved') {
         if ($request['request_type'] === 'create') {
-            db_run('UPDATE users SET status = "active" WHERE id = ?', [$request['company_id']]);
+            db_run('UPDATE users SET status = ? WHERE id = ?', [auth_user_status('active', 'active'), $request['company_id']]);
+            ensure_company_profile_for_user(find_user((int) $request['company_id']));
         }
 
         if ($request['request_type'] === 'update') {
@@ -408,17 +466,35 @@ if ($action === 'review_company_request') {
                 'UPDATE users SET company_name = ?, phone = ?, address = ? WHERE id = ?',
                 [$companyName, $phone, $address, $request['company_id']]
             );
+
+            if (company_table_enabled()) {
+                $companyTableId = company_id_for_owner_user((int) $request['company_id']);
+                if ($companyTableId > 0) {
+                    db_run(
+                        'UPDATE companies SET name = ?, address = ?, contact_phone = ? WHERE id = ?',
+                        [$companyName, $address, $phone, $companyTableId]
+                    );
+                }
+            }
         }
 
         if ($request['request_type'] === 'delete') {
             db_run('UPDATE users SET status = "inactive" WHERE id = ?', [$request['company_id']]);
             db_run('UPDATE users SET status = "inactive" WHERE company_id = ?', [$request['company_id']]);
             db_run('UPDATE vehicles SET status = "unavailable" WHERE company_id = ?', [$request['company_id']]);
+            if (company_table_enabled()) {
+                $companyTableId = company_id_for_owner_user((int) $request['company_id']);
+                if ($companyTableId > 0) {
+                    db_run('UPDATE companies SET status = "rejected" WHERE id = ?', [$companyTableId]);
+                    db_run('UPDATE users SET status = "inactive" WHERE company_id = ?', [$companyTableId]);
+                    db_run('UPDATE vehicles SET status = "unavailable" WHERE company_id = ?', [$companyTableId]);
+                }
+            }
         }
     }
 
     if ($decision === 'rejected' && $request['request_type'] === 'create') {
-        db_run('UPDATE users SET status = "rejected" WHERE id = ?', [$request['company_id']]);
+        db_run('UPDATE users SET status = ? WHERE id = ?', [auth_user_status('rejected', 'inactive'), $request['company_id']]);
     }
 
     db_run(
@@ -447,6 +523,14 @@ if ($action === 'admin_delete_company') {
     db_run('UPDATE users SET status = "inactive" WHERE id = ?', [$companyId]);
     db_run('UPDATE users SET status = "inactive" WHERE company_id = ?', [$companyId]);
     db_run('UPDATE vehicles SET status = "unavailable" WHERE company_id = ?', [$companyId]);
+    if (company_table_enabled()) {
+        $companyTableId = company_id_for_owner_user($companyId);
+        if ($companyTableId > 0) {
+            db_run('UPDATE companies SET status = "rejected" WHERE id = ?', [$companyTableId]);
+            db_run('UPDATE users SET status = "inactive" WHERE company_id = ?', [$companyTableId]);
+            db_run('UPDATE vehicles SET status = "unavailable" WHERE company_id = ?', [$companyTableId]);
+        }
+    }
 
     flash('Company deactivated by admin.', 'success');
     go('../dashboard.php');

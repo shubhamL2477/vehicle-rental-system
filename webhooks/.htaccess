@@ -1,0 +1,4 @@
+Options -Indexes
+DirectorySlash Off
+RewriteEngine On
+RewriteRule ^stripe/?$ stripe.php [L]

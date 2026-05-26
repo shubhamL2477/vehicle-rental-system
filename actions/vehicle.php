@@ -27,6 +27,10 @@ if ($action === 'save') {
     $lat = trim($_POST['latitude'] ?? '');
     $lng = trim($_POST['longitude'] ?? '');
 
+    if (is_platform_admin_role($me['role_name'])) {
+        $companyId = (int) ($_POST['company_id'] ?? 0);
+    }
+
     if (!$companyId || !$categoryId || !$typeId || $name === '' || $location === '' || $selfPrice <= 0 || $driverPrice <= 0) {
         flash('Vehicle category, type, name, location and both prices are required.', 'danger');
         go('../dashboard.php');
@@ -49,7 +53,10 @@ if ($action === 'save') {
     $image = save_upload('image', VEHICLE_UPLOAD_PATH, 'uploads/vehicles/');
 
     if ($id > 0) {
-        $old = db_one('SELECT * FROM vehicles WHERE id = ? AND company_id = ?', [$id, $companyId]);
+        $old = is_platform_admin_role($me['role_name'])
+            ? db_one('SELECT * FROM vehicles WHERE id = ?', [$id])
+            : db_one('SELECT * FROM vehicles WHERE id = ? AND company_id = ?', [$id, $companyId]);
+
         if (!$old) {
             flash('Vehicle not found.', 'danger');
             go('../dashboard.php');
@@ -61,10 +68,10 @@ if ($action === 'save') {
 
         db_run(
             'UPDATE vehicles
-             SET category_id = ?, type_id = ?, name = ?, location = ?, self_drive_price = ?, with_driver_price = ?,
+             SET company_id = ?, category_id = ?, type_id = ?, name = ?, location = ?, self_drive_price = ?, with_driver_price = ?,
                  description = ?, status = ?, latitude = ?, longitude = ?, image = ?
-             WHERE id = ? AND company_id = ?',
-            [$categoryId, $typeId, $name, $location, $selfPrice, $driverPrice, $description, $status, $lat ?: null, $lng ?: null, $image, $id, $companyId]
+             WHERE id = ?',
+            [$companyId, $categoryId, $typeId, $name, $location, $selfPrice, $driverPrice, $description, $status, $lat ?: null, $lng ?: null, $image, $id]
         );
 
         flash('Vehicle updated.', 'success');
@@ -91,7 +98,12 @@ if ($action === 'delete') {
         go('../dashboard.php');
     }
 
-    db_run('DELETE FROM vehicles WHERE id = ? AND company_id = ?', [$id, $companyId]);
+    if (is_platform_admin_role($me['role_name'])) {
+        db_run('DELETE FROM vehicles WHERE id = ?', [$id]);
+    } else {
+        db_run('DELETE FROM vehicles WHERE id = ? AND company_id = ?', [$id, $companyId]);
+    }
+
     flash('Vehicle deleted.', 'success');
     go('../dashboard.php');
 }
@@ -141,6 +153,7 @@ if ($action === 'maintenance_delete') {
 }
 
 if ($action === 'service_history') {
+    ensure_service_history_schema();
     $vehicleId = (int) ($_POST['vehicle_id'] ?? 0);
     $vehicle = db_one('SELECT * FROM vehicles WHERE id = ? LIMIT 1', [$vehicleId]);
 
@@ -162,12 +175,27 @@ if ($action === 'service_history') {
     }
 
     db_run(
-        'INSERT INTO vehicle_service_history (vehicle_id, company_id, service_type, provider, mileage, cost, service_date, notes, created_by_user_id)
+        'INSERT INTO service_history (vehicle_id, company_id, service_type, provider, mileage, cost, service_date, notes, created_by_user_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [$vehicleId, (int) $vehicle['company_id'], $serviceType, $provider, max(0, $mileage), max(0, $cost), $serviceDate, $notes, (int) $me['id']]
     );
 
     flash('Service history added.', 'success');
+    go('../dashboard.php?section=maintenance');
+}
+
+if ($action === 'service_history_delete') {
+    ensure_service_history_schema();
+    $serviceId = (int) ($_POST['service_id'] ?? 0);
+    $record = db_one('SELECT * FROM service_history WHERE id = ? LIMIT 1', [$serviceId]);
+
+    if (!$record || (!is_platform_admin_role($me['role_name']) && (int) $record['company_id'] !== $companyId)) {
+        flash('Service history record not found for your company.', 'danger');
+        go('../dashboard.php?section=maintenance');
+    }
+
+    db_run('DELETE FROM service_history WHERE id = ?', [$serviceId]);
+    flash('Service history deleted.', 'success');
     go('../dashboard.php?section=maintenance');
 }
 

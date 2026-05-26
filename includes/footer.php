@@ -53,8 +53,32 @@
     </section>
 </main>
 <footer class="footer">
-    <p>Hyrox Rental - Sprint 1</p>
+    <p>&copy; <?= date('Y') ?> Hyrox Rental. All rights reserved.</p>
+    <p>
+        <a href="index.php">Home</a>
+        <a href="vehicles.php">Vehicles</a>
+        <?php if (current_user()): ?>
+            <a href="dashboard.php">Dashboard</a>
+        <?php else: ?>
+            <a href="login.php">Login</a>
+        <?php endif; ?>
+    </p>
 </footer>
-<script src="assets/js/app.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/app.js')) ?>"></script>
+<?php
+$scriptFiles = [
+    'assets/js/auth.js',
+    'assets/js/booking.js',
+    'assets/js/gps.js',
+    'assets/js/vehicle-filters.js',
+    'assets/js/vehicle-search.js',
+    'assets/js/chatbot.js',
+];
+?>
+<?php foreach ($scriptFiles as $scriptFile): ?>
+    <?php $scriptPath = __DIR__ . '/../' . $scriptFile; ?>
+    <?php if (is_file($scriptPath)): ?>
+        <script src="<?= e($scriptFile) ?>?v=<?= e((string) filemtime($scriptPath)) ?>"></script>
+    <?php endif; ?>
+<?php endforeach; ?>
 </body>
 </html>

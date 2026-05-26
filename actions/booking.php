@@ -7,6 +7,46 @@ require_once __DIR__ . '/../backend/models/NotificationService.php';
 check_csrf();
 $action = $_POST['action'] ?? '';
 
+function cancel_booking_with_refund_state($booking, $note)
+{
+    $refundMessage = '';
+    $paymentStatus = (string) ($booking['payment_status'] ?? '');
+
+    if (in_array($paymentStatus, ['paid', 'pending'], true)) {
+        $paymentStatus = $paymentStatus === 'paid' ? 'refunded' : 'failed';
+        $refundMessage = $paymentStatus === 'refunded'
+            ? 'Refund status: marked as refunded in the booking record. Stripe refunds must be completed from the Stripe dashboard if live payments were used.'
+            : 'Payment status: pending payment was cancelled.';
+
+        if (
+            $paymentStatus === 'refunded'
+            && ($booking['payment_method'] ?? '') === 'stripe'
+            && !empty($booking['stripe_payment_intent_id'])
+        ) {
+            try {
+                StripePaymentModel::refundPaymentIntent((string) $booking['stripe_payment_intent_id']);
+                $refundMessage = 'Refund status: Stripe refund request was submitted and the booking was marked refunded.';
+            } catch (Throwable $throwable) {
+                db_log_error($throwable, 'cancel_booking_with_refund_state');
+                $refundMessage = 'Refund status: booking marked refunded, but Stripe refund request needs manual review: ' . $throwable->getMessage();
+            }
+        }
+
+        db_run(
+            'UPDATE bookings SET status = "cancelled", payment_status = ?, agent_note = ? WHERE id = ?',
+            [$paymentStatus, $note . ' ' . $refundMessage, (int) $booking['id']]
+        );
+    } else {
+        db_run(
+            'UPDATE bookings SET status = "cancelled", agent_note = ? WHERE id = ?',
+            [$note, (int) $booking['id']]
+        );
+    }
+
+    send_booking_cancellation_email((int) $booking['id'], $refundMessage);
+    NotificationService::notifyBookingStatus((int) $booking['id'], 'cancelled');
+}
+
 if ($action === 'create') {
     require_role('user');
     $me = current_user();
@@ -167,7 +207,7 @@ if ($action === 'extend') {
         [$bookingId, $me['id']]
     );
 
-    if (!$booking || !in_array($booking['status'], ['pending', 'approved'], true)) {
+    if (!$booking || !in_array($booking['status'], ['approved', 'confirmed'], true)) {
         flash('Only active bookings can be extended.', 'danger');
         go('../dashboard.php?section=bookings');
     }
@@ -177,21 +217,38 @@ if ($action === 'extend') {
         go('../dashboard.php?section=bookings');
     }
 
+    $extraDays = booking_days(date('Y-m-d', strtotime($booking['end_date'] . ' +1 day')), $newEnd);
+    if ($extraDays < 1 || $extraDays > 2) {
+        flash('Booking can only be extended by up to 2 days.', 'danger');
+        go('../dashboard.php?section=bookings');
+    }
+
     if (vehicle_unavailable_reason($booking['vehicle_id'], $booking['start_date'], $newEnd, $bookingId) !== '') {
         flash('Cannot extend because the vehicle is unavailable for the new dates.', 'danger');
         go('../dashboard.php?section=bookings');
     }
 
     $total = booking_total($booking, $booking['start_date'], $newEnd, (bool) $booking['with_driver']);
+    if ($total <= 0) {
+        flash('Vehicle price is not configured for this extension.', 'danger');
+        go('../dashboard.php?section=bookings');
+    }
+
+    $oldTotal = (float) $booking['total_price'];
+    $extraCost = max(0, $total - $oldTotal);
+    $note = 'Booking extended by ' . $extraDays . ' day(s). Extra cost: ' . money($extraCost) . '.';
 
     db_run(
         'UPDATE bookings
-         SET end_date = ?, end_datetime = ?, total_price = ?, status = "pending", agent_note = ?
+         SET end_date = ?, end_datetime = ?, total_price = ?, agent_note = ?
          WHERE id = ?',
-        [$newEnd, booking_end_datetime($newEnd), $total, 'User requested booking extension. Waiting for agent approval.', $bookingId]
+        [$newEnd, booking_end_datetime($newEnd), $total, $note, $bookingId]
     );
 
-    flash('Booking extension requested. Agent approval is required again.', 'success');
+    NotificationService::notify((int) $booking['user_id'], 'Booking extended', 'Your booking #' . $bookingId . ' was extended until ' . $newEnd . '. Extra cost: ' . money($extraCost) . '.', 'booking');
+    NotificationService::notifyMany(NotificationService::companyRecipients((int) $booking['company_id']), 'Booking extended', 'Booking #' . $bookingId . ' was extended until ' . $newEnd . '.', 'booking');
+
+    flash('Booking extended successfully.', 'success');
     go('../dashboard.php?section=bookings');
 }
 
@@ -204,7 +261,7 @@ if ($action === 'change_vehicle') {
     $booking = db_one('SELECT * FROM bookings WHERE id = ? AND user_id = ?', [$bookingId, $me['id']]);
     $vehicle = db_one('SELECT * FROM vehicles WHERE id = ? AND status = "available"', [$vehicleId]);
 
-    if (!$booking || !$vehicle || !in_array($booking['status'], ['pending', 'approved'], true)) {
+    if (!$booking || !$vehicle || !in_array($booking['status'], ['approved', 'confirmed'], true) || (int) $booking['vehicle_id'] === $vehicleId) {
         flash('Vehicle change request is not valid.', 'danger');
         go('../dashboard.php?section=bookings');
     }
@@ -214,23 +271,48 @@ if ($action === 'change_vehicle') {
         go('../dashboard.php?section=bookings');
     }
 
+    $dailyRate = $booking['with_driver'] ? (float) $vehicle['with_driver_price'] : (float) $vehicle['self_drive_price'];
+    if ($dailyRate <= 0) {
+        flash('Selected vehicle price is not configured for this booking mode.', 'danger');
+        go('../dashboard.php?section=bookings');
+    }
+
     $total = booking_total($vehicle, $booking['start_date'], $booking['end_date'], (bool) $booking['with_driver']);
+    $oldTotal = (float) $booking['total_price'];
+    $difference = $total - $oldTotal;
+    $paymentStatus = (string) $booking['payment_status'];
+
+    if ($paymentStatus === 'paid' && $difference > 0) {
+        $paymentStatus = 'pending';
+    }
+
+    if ($difference > 0) {
+        $priceNote = 'Additional payment needed: ' . money($difference) . '.';
+    } elseif ($difference < 0) {
+        $priceNote = 'New vehicle is cheaper by ' . money(abs($difference)) . '.';
+    } else {
+        $priceNote = 'No price difference.';
+    }
 
     db_run(
         'UPDATE bookings
-         SET vehicle_id = ?, company_id = ?, agent_id = NULL, daily_rate = ?, total_price = ?, status = "pending", agent_note = ?
+         SET vehicle_id = ?, company_id = ?, agent_id = NULL, daily_rate = ?, total_price = ?, payment_status = ?, agent_note = ?
          WHERE id = ?',
         [
             $vehicleId,
             $vehicle['company_id'],
-            $booking['with_driver'] ? $vehicle['with_driver_price'] : $vehicle['self_drive_price'],
+            $dailyRate,
             $total,
-            'User requested vehicle change. Waiting for agent approval.',
+            $paymentStatus,
+            'Vehicle changed by user. ' . $priceNote,
             $bookingId
         ]
     );
 
-    flash('Vehicle change requested. Agent approval is required again.', 'success');
+    NotificationService::notify((int) $booking['user_id'], 'Vehicle changed', 'Your booking #' . $bookingId . ' was changed to ' . $vehicle['name'] . '. ' . $priceNote, 'booking');
+    NotificationService::notifyMany(NotificationService::companyRecipients((int) $vehicle['company_id']), 'Vehicle changed', 'Booking #' . $bookingId . ' was changed to ' . $vehicle['name'] . '.', 'booking');
+
+    flash('Vehicle changed successfully. ' . $priceNote, 'success');
     go('../dashboard.php?section=bookings');
 }
 
@@ -246,11 +328,7 @@ if ($action === 'cancel') {
         go('../dashboard.php?section=bookings');
     }
 
-    db_run(
-        'UPDATE bookings SET status = "cancelled", agent_note = ? WHERE id = ?',
-        ['Cancelled by user.', $bookingId]
-    );
-    NotificationService::notifyBookingStatus($bookingId, 'cancelled');
+    cancel_booking_with_refund_state($booking, 'Cancelled by user.');
 
     flash('Booking cancelled successfully.', 'success');
     go('../dashboard.php?section=bookings');
@@ -367,8 +445,14 @@ if ($action === 'admin_cancel') {
         go('../dashboard.php?section=bookings');
     }
 
-    db_run('UPDATE bookings SET status = "cancelled", agent_note = ? WHERE id = ?', ['Cancelled by platform admin.', $bookingId]);
-    NotificationService::notifyBookingStatus($bookingId, 'cancelled');
+    $booking = db_one('SELECT * FROM bookings WHERE id = ? LIMIT 1', [$bookingId]);
+
+    if (!$booking) {
+        flash('Booking not found.', 'danger');
+        go('../dashboard.php?section=bookings');
+    }
+
+    cancel_booking_with_refund_state($booking, 'Cancelled by platform admin.');
     flash('Booking cancelled by admin.', 'success');
     go('../dashboard.php?section=bookings');
 }

@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../../backend/routes/api_common.php';
 require_once __DIR__ . '/../../backend/models/BookingModel.php';
 require_once __DIR__ . '/../../backend/models/StripePaymentModel.php';
+require_once __DIR__ . '/../../backend/models/NotificationService.php';
 
 try {
     api_require_method('POST');
@@ -20,6 +21,7 @@ try {
     }
 
     $booking = BookingModel::createForUser($user, $data);
+    NotificationService::notifyBookingSubmitted((int) $booking['id']);
     $response = BookingModel::confirmationData($booking);
 
     if ($booking['payment_method'] === 'stripe') {

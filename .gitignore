@@ -1,6 +1,7 @@
 /vendor/
 /uploads/
 /logs/
+/tmp/
 .env
 *.log
 .DS_Store

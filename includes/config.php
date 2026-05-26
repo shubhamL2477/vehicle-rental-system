@@ -42,10 +42,49 @@ function env_value($key, $default = '')
     return $value;
 }
 
+function default_app_public_url()
+{
+    $fallback = 'http://localhost/vehicle-rental-system-clean';
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+
+    if ($host === '') {
+        return $fallback;
+    }
+
+    $scheme = 'http';
+    if (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? '') === '443')
+    ) {
+        $scheme = 'https';
+    }
+
+    $documentRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+    $appRoot = realpath(dirname(__DIR__));
+    $basePath = '';
+
+    if ($documentRoot && $appRoot) {
+        $documentRoot = str_replace('\\', '/', rtrim($documentRoot, '/\\'));
+        $appRoot = str_replace('\\', '/', rtrim($appRoot, '/\\'));
+
+        if (strpos($appRoot, $documentRoot) === 0) {
+            $basePath = substr($appRoot, strlen($documentRoot));
+        }
+    }
+
+    $basePath = '/' . trim(str_replace('\\', '/', $basePath), '/');
+
+    if ($basePath === '/') {
+        $basePath = '';
+    }
+
+    return $scheme . '://' . $host . $basePath;
+}
+
 define('APP_NAME', 'Hyrox Rental');
 define('APP_TAGLINE', 'Reserve verified vehicles across trusted companies.');
 define('APP_ROOT', dirname(__DIR__));
-define('APP_PUBLIC_URL', rtrim(env_value('APP_PUBLIC_URL', 'http://localhost/vehicle-rental-system'), '/'));
+define('APP_PUBLIC_URL', rtrim(env_value('APP_PUBLIC_URL', default_app_public_url()), '/'));
 
 define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'vehicle_rental');

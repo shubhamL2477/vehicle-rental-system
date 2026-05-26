@@ -33,31 +33,45 @@ $reviews = db_all(
     [$id]
 );
 $me = current_user();
+$bookingVehicleOptions = $me && $me['role_name'] === 'user' ? available_vehicle_options(0) : [];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<section class="detail">
-    <div>
+<a class="back-link" href="vehicles.php">Back to Vehicles</a>
+
+<section class="detail detail-hero">
+    <div class="detail-gallery">
         <?php if ($vehicle['image']): ?>
             <img class="detail-img" src="<?= e(vehicle_image_src($vehicle['image'])) ?>" alt="<?= e($vehicle['name']) ?>">
         <?php else: ?>
-            <div class="image-place big">No image uploaded</div>
+            <div class="image-place big">Vehicle image coming soon</div>
         <?php endif; ?>
+        <span class="gallery-control gallery-control-left" aria-hidden="true">&#8249;</span>
+        <span class="gallery-control gallery-control-right" aria-hidden="true">&#8250;</span>
     </div>
-    <div class="box">
+    <div class="box detail-summary">
         <span class="<?= e(role_badge($vehicle['status'])) ?>"><?= e($vehicle['status']) ?></span>
         <h1><?= e($vehicle['name']) ?></h1>
-        <p class="rating-line"><?= e(rating_text($reviewStats['average_rating'], $reviewStats['review_count'])) ?></p>
-        <p><?= e($vehicle['category_name']) ?> - <?= e($vehicle['type_name']) ?> from <?= e($vehicle['company_name']) ?>, <?= e($vehicle['location']) ?></p>
-        <h2><?= e(money($vehicle['self_drive_price'])) ?> self-drive / day</h2>
-        <h2><?= e(money($vehicle['with_driver_price'])) ?> with driver / day</h2>
+        <?= rating_html($reviewStats['average_rating'], $reviewStats['review_count']) ?>
+        <p class="detail-meta"><?= e($vehicle['category_name']) ?> | <?= e($vehicle['type_name']) ?> | <?= e($vehicle['location']) ?></p>
+        <p class="muted">Listed by <?= e($vehicle['company_name']) ?></p>
+        <div class="price-stack">
+            <span><b><?= e(money($vehicle['self_drive_price'])) ?></b> self-drive / day</span>
+            <span><b><?= e(money($vehicle['with_driver_price'])) ?></b> with driver / day</span>
+        </div>
         <p><?= e($vehicle['description']) ?></p>
-        <p>GPS: <?= e($vehicle['latitude'] ?: 'N/A') ?>, <?= e($vehicle['longitude'] ?: 'N/A') ?></p>
-        <p>Company phone: <?= e($vehicle['company_phone']) ?></p>
+        <div class="detail-facts">
+            <span
+                data-gps-tracker
+                data-lat="<?= e($vehicle['latitude'] ?: '') ?>"
+                data-lng="<?= e($vehicle['longitude'] ?: '') ?>"
+            ><b>GPS</b><?= e($vehicle['latitude'] ?: 'N/A') ?>, <?= e($vehicle['longitude'] ?: 'N/A') ?></span>
+            <span><b>Company phone</b><?= e($vehicle['company_phone']) ?></span>
+        </div>
     </div>
 </section>
 
-<section class="grid two">
+<section class="grid two booking-detail-grid">
     <div class="box">
         <h2>Book this vehicle</h2>
         <?php if (!$me): ?>
@@ -69,7 +83,19 @@ require __DIR__ . '/includes/header.php';
             <form class="simple-form" action="actions/booking.php" method="post" enctype="multipart/form-data" data-booking-form data-vehicle-id="<?= e($vehicle['id']) ?>" data-self-rate="<?= e($vehicle['self_drive_price']) ?>" data-driver-rate="<?= e($vehicle['with_driver_price']) ?>">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="create">
-                <input type="hidden" name="vehicle_id" value="<?= e($vehicle['id']) ?>">
+                <label>Vehicle</label>
+                <select name="vehicle_id" data-booking-vehicle-select required>
+                    <?php foreach ($bookingVehicleOptions as $option): ?>
+                        <option
+                            value="<?= e($option['id']) ?>"
+                            data-self-rate="<?= e($option['self_drive_price']) ?>"
+                            data-driver-rate="<?= e($option['with_driver_price']) ?>"
+                            <?= (int) $option['id'] === (int) $vehicle['id'] ? 'selected' : '' ?>
+                        >
+                            <?= e($option['name'] . ' | ' . $option['location'] . ' | ' . money($option['self_drive_price']) . ' self-drive') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <label>Start date</label>
                 <input type="date" name="start_date" min="<?= e(date('Y-m-d')) ?>" required>
                 <label>End date</label>
@@ -107,6 +133,22 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <div class="box">
+        <h2>Availability calendar</h2>
+        <div class="availability-calendar" data-availability-calendar>
+            <div class="calendar-head">
+                <button class="btn light tiny" type="button" data-calendar-prev>Prev</button>
+                <strong data-calendar-title>Loading</strong>
+                <button class="btn light tiny" type="button" data-calendar-next>Next</button>
+            </div>
+            <div class="calendar-weekdays">
+                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+            </div>
+            <div class="calendar-grid" data-calendar-grid></div>
+            <div class="calendar-legend">
+                <span><i class="calendar-free"></i>Available</span>
+                <span><i class="calendar-blocked"></i>Unavailable</span>
+            </div>
+        </div>
         <h2>Maintenance blackout</h2>
         <?php if (!$maintenance): ?>
             <p>No maintenance dates added.</p>

@@ -19,22 +19,22 @@ if ($action === 'create') {
 
     if (!$booking) {
         flash('Booking not found for review.', 'danger');
-        go('../dashboard.php?section=reviews');
+        go('../dashboard.php?section=bookings');
     }
 
     if (!user_can_review_booking($booking)) {
         flash('You can review only after a paid rental is completed.', 'danger');
-        go('../dashboard.php?section=reviews');
+        go('../dashboard.php?section=booking_detail&booking_id=' . $bookingId);
     }
 
     if ($rating < 1 || $rating > 5) {
         flash('Rating must be between 1 and 5.', 'danger');
-        go('../dashboard.php?section=reviews');
+        go('../dashboard.php?section=booking_detail&booking_id=' . $bookingId);
     }
 
     if (db_one('SELECT id FROM reviews WHERE booking_id = ?', [$bookingId])) {
         flash('This booking already has a review.', 'warning');
-        go('../dashboard.php?section=reviews');
+        go('../dashboard.php?section=booking_detail&booking_id=' . $bookingId);
     }
 
     db_run(
@@ -44,7 +44,7 @@ if ($action === 'create') {
     );
 
     flash('Review submitted successfully.', 'success');
-    go('../dashboard.php?section=reviews');
+    go('../dashboard.php?section=booking_detail&booking_id=' . $bookingId);
 }
 
 if ($action === 'site_rating') {
