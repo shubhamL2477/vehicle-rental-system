@@ -1,0 +1,10 @@
+Options -Indexes
+DirectorySlash Off
+RewriteEngine On
+RewriteRule ^register/?$ register.php [L]
+RewriteRule ^login/?$ login.php [L]
+RewriteRule ^vehicles/?$ vehicles.php [L]
+RewriteRule ^otp/verify/?$ otp/verify.php [L]
+RewriteRule ^bookings/?$ bookings/index.php [L]
+RewriteRule ^maintenance/?$ maintenance/index.php [L]
+RewriteRule ^consultant/?$ consultant/index.php [L]

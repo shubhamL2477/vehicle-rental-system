@@ -39,8 +39,8 @@ function send_plain_email($to, $name, $subject, $body)
         return false;
     }
 
-    if (MAIL_USERNAME === 'your-email@gmail.com' || MAIL_PASSWORD === 'your-gmail-app-password' || MAIL_PASSWORD === 'PASTE_GMAIL_APP_PASSWORD_HERE') {
-        set_mail_error('SMTP is not configured. Update MAIL_USERNAME and MAIL_PASSWORD in includes/config.php.');
+    if (MAIL_USERNAME === '' || MAIL_PASSWORD === '' || MAIL_USERNAME === 'your-email@gmail.com' || MAIL_PASSWORD === 'your-gmail-app-password' || MAIL_PASSWORD === 'PASTE_GMAIL_APP_PASSWORD_HERE') {
+        set_mail_error('SMTP is not configured. Update MAIL_USERNAME and MAIL_PASSWORD in .env.');
         return false;
     }
 
@@ -63,6 +63,15 @@ function send_plain_email($to, $name, $subject, $body)
         $mail->Password = $smtpPassword;
         $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = MAIL_PORT;
+
+        $caFile = dirname(APP_ROOT, 2) . '/apache/bin/curl-ca-bundle.crt';
+        if (is_file($caFile)) {
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'cafile' => $caFile,
+                ],
+            ];
+        }
 
         $from = MAIL_FROM ?: MAIL_USERNAME;
         $mail->setFrom($from, APP_NAME);
@@ -103,6 +112,37 @@ function send_booking_confirmation_email($bookingId)
         . "Thank you for using " . APP_NAME . '.';
 
     return send_plain_email($booking['user_email'], $booking['user_name'], 'Booking confirmed - ' . APP_NAME, $body);
+}
+
+function send_booking_cancellation_email($bookingId, $refundMessage = '')
+{
+    $booking = db_one(
+        'SELECT b.*, u.name AS user_name, u.email AS user_email, v.name AS vehicle_name
+         FROM bookings b
+         JOIN users u ON u.id = b.user_id
+         JOIN vehicles v ON v.id = b.vehicle_id
+         WHERE b.id = ?',
+        [$bookingId]
+    );
+
+    if (!$booking) {
+        set_mail_error('Booking not found for cancellation email.');
+        return false;
+    }
+
+    $body = "Dear {$booking['user_name']},\n\n"
+        . "Your booking has been cancelled.\n\n"
+        . "Vehicle: {$booking['vehicle_name']}\n"
+        . "Dates: {$booking['start_date']} to {$booking['end_date']}\n"
+        . "Total: " . money($booking['total_price']) . "\n";
+
+    if ($refundMessage !== '') {
+        $body .= "\n" . $refundMessage . "\n";
+    }
+
+    $body .= "\nThank you for using " . APP_NAME . '.';
+
+    return send_plain_email($booking['user_email'], $booking['user_name'], 'Booking cancelled - ' . APP_NAME, $body);
 }
 
 function send_payment_receipt_email($paymentId)

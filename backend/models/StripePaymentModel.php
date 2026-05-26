@@ -93,6 +93,22 @@ class StripePaymentModel
         return $session;
     }
 
+    public static function refundPaymentIntent($paymentIntentId, $reason = 'requested_by_customer')
+    {
+        $paymentIntentId = trim((string) $paymentIntentId);
+
+        if ($paymentIntentId === '') {
+            throw new InvalidArgumentException('Stripe payment intent id is required for a refund.');
+        }
+
+        self::configureStripe();
+
+        return \Stripe\Refund::create([
+            'payment_intent' => $paymentIntentId,
+            'reason' => $reason,
+        ]);
+    }
+
     public static function verifyWebhookEvent($payload, $signatureHeader)
     {
         self::requireWebhookConfig();

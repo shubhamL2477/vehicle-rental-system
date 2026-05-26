@@ -62,7 +62,7 @@ class MaintenanceModel
         }
 
         if (in_array($user['role_name'], ['company', 'agent'], true)) {
-            $companyId = $user['role_name'] === 'company' ? (int) $user['id'] : (int) $user['company_id'];
+            $companyId = managed_company_id($user);
 
             if ((int) $vehicle['company_id'] !== $companyId) {
                 throw new RuntimeException('You cannot manage maintenance outside your company.');
@@ -172,7 +172,11 @@ class MaintenanceModel
         }
 
         if (in_array($user['role_name'], ['company', 'agent'], true)) {
-            api_require_company_access($user, (int) $record['company_id']);
+            $allowedCompanyId = require_company_resource_access($user, (int) $record['company_id']);
+
+            if ($allowedCompanyId < 1) {
+                throw new RuntimeException('You cannot manage maintenance outside your company.');
+            }
         }
 
         if (!empty($record['availability_block_id'])) {

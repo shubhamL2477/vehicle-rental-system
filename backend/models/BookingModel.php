@@ -61,21 +61,33 @@ class BookingModel
         try {
             $pdo->beginTransaction();
 
-            $vehicle = db_one(
-                'SELECT v.*, u.status AS company_status, u.company_name
-                 FROM vehicles v
-                 JOIN users u ON u.id = v.company_id
-                 WHERE v.id = ?
-                 LIMIT 1
-                 FOR UPDATE',
-                [$payload['vehicle_id']]
-            );
+            if (company_table_enabled()) {
+                $vehicle = db_one(
+                    'SELECT v.*, company.status AS company_status, company.name AS company_name
+                     FROM vehicles v
+                     JOIN companies company ON company.id = v.company_id
+                     WHERE v.id = ?
+                     LIMIT 1
+                     FOR UPDATE',
+                    [$payload['vehicle_id']]
+                );
+            } else {
+                $vehicle = db_one(
+                    'SELECT v.*, u.status AS company_status, u.company_name
+                     FROM vehicles v
+                     JOIN users u ON u.id = v.company_id
+                     WHERE v.id = ?
+                     LIMIT 1
+                     FOR UPDATE',
+                    [$payload['vehicle_id']]
+                );
+            }
 
             if (!$vehicle || $vehicle['status'] !== 'available') {
                 throw new RuntimeException('The selected vehicle is not available.');
             }
 
-            if ($vehicle['company_status'] !== 'active') {
+            if (!in_array($vehicle['company_status'], ['active', 'approved'], true)) {
                 throw new RuntimeException('The vehicle company is not active.');
             }
 
@@ -199,6 +211,22 @@ class BookingModel
 
     public static function findConfirmation($bookingId)
     {
+        if (company_table_enabled()) {
+            return db_one(
+                'SELECT b.*, v.name AS vehicle_name, v.self_drive_price, v.with_driver_price,
+                        COALESCE(NULLIF(company.name, ""), owner.company_name, owner.name) AS company_name,
+                        renter.email AS user_email
+                 FROM bookings b
+                 JOIN vehicles v ON v.id = b.vehicle_id
+                 JOIN companies company ON company.id = b.company_id
+                 LEFT JOIN users owner ON owner.id = company.owner_user_id
+                 JOIN users renter ON renter.id = b.user_id
+                 WHERE b.id = ?
+                 LIMIT 1',
+                [(int) $bookingId]
+            );
+        }
+
         return db_one(
             'SELECT b.*, v.name AS vehicle_name, v.self_drive_price, v.with_driver_price,
                     u.company_name, renter.email AS user_email

@@ -1,18 +1,13 @@
 <?php
-require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/backend/routes/api_common.php';
 require_once __DIR__ . '/backend/models/NotificationService.php';
+require_once __DIR__ . '/backend/models/VehicleConsultantModel.php';
 
 header('Content-Type: application/json');
 
 function json_out($ok, $message, $data = [], $code = 200)
 {
-    http_response_code($code);
-    echo json_encode([
-        'success' => $ok,
-        'message' => $message,
-        'data' => $data
-    ]);
-    exit;
+    api_response($ok, $message, $data, $code);
 }
 
 function input_data()
@@ -20,20 +15,6 @@ function input_data()
     $raw = file_get_contents('php://input');
     $json = json_decode($raw, true);
     return is_array($json) ? $json : $_POST;
-}
-
-function api_user_required($roles = [])
-{
-    $user = api_token_user();
-    if (!$user) {
-        json_out(false, 'JWT token required.', [], 401);
-    }
-
-    if ($roles && !role_allowed($user['role_name'], $roles)) {
-        json_out(false, 'Not allowed for this role.', [], 403);
-    }
-
-    return $user;
 }
 
 function api_company_scope_or_forbidden($user, $companyId)
@@ -127,104 +108,24 @@ if ($action === 'register') {
 }
 
 if ($action === 'vehicles') {
-    $search = trim($_GET['search'] ?? '');
-    $startDate = trim($_GET['start_date'] ?? '');
-    $endDate = trim($_GET['end_date'] ?? '');
-    $categoryId = (int) ($_GET['category_id'] ?? 0);
-    $typeId = (int) ($_GET['type_id'] ?? 0);
-    $minPrice = (float) ($_GET['min_price'] ?? 0);
-    $maxPrice = (float) ($_GET['max_price'] ?? 0);
+    [$vehicles, $filters] = filtered_vehicles($_GET, 100);
+    json_out(true, 'Vehicles loaded.', ['vehicles' => $vehicles, 'filters' => $filters]);
+}
 
-    $params = [];
-    $where = 'WHERE v.status = "available"';
+if ($action === 'vehicle_consultant') {
+    try {
+        $payload = $data ?: $_GET;
+        $result = VehicleConsultantModel::recommend($payload);
 
-    if ($startDate !== '' && $endDate !== '' && strtotime($endDate) >= strtotime($startDate)) {
-        $where .= ' AND NOT EXISTS (
-            SELECT 1 FROM maintenance m
-            WHERE m.vehicle_id = v.id AND ? <= m.end_date AND ? >= m.start_date
-        )';
-        $params[] = $startDate;
-        $params[] = $endDate;
-
-        $where .= ' AND NOT EXISTS (
-            SELECT 1 FROM bookings b
-            WHERE b.vehicle_id = v.id AND b.status IN ("pending", "approved", "confirmed")
-            AND ? <= b.end_date AND ? >= b.start_date
-        )';
-        $params[] = $startDate;
-        $params[] = $endDate;
-
-        $where .= ' AND NOT EXISTS (
-            SELECT 1 FROM availability_blocks ab
-            WHERE ab.vehicle_id = v.id AND ? <= DATE(ab.end_datetime) AND ? >= DATE(ab.start_datetime)
-        )';
-        $params[] = $startDate;
-        $params[] = $endDate;
-    } else {
-        $where .= ' AND NOT EXISTS (
-            SELECT 1 FROM maintenance m
-            WHERE m.vehicle_id = v.id AND CURDATE() BETWEEN m.start_date AND m.end_date
-        )';
-
-        $where .= ' AND NOT EXISTS (
-            SELECT 1 FROM bookings b
-            WHERE b.vehicle_id = v.id AND b.status IN ("pending", "approved", "confirmed")
-            AND CURDATE() BETWEEN b.start_date AND b.end_date
-        )';
-
-        $where .= ' AND NOT EXISTS (
-            SELECT 1 FROM availability_blocks ab
-            WHERE ab.vehicle_id = v.id AND CURDATE() BETWEEN DATE(ab.start_datetime) AND DATE(ab.end_datetime)
-        )';
+        json_out(true, 'Vehicle consultant response ready.', $result);
+    } catch (Throwable $throwable) {
+        db_log_error($throwable, 'api.php vehicle_consultant');
+        json_out(false, 'Consultant could not load recommendations right now.', [], 500);
     }
-
-    if ($search !== '') {
-        $where .= ' AND (v.name LIKE ? OR COALESCE(NULLIF(u.company_name, ""), u.name) LIKE ? OR v.location LIKE ?)';
-        $params[] = '%' . $search . '%';
-        $params[] = '%' . $search . '%';
-        $params[] = '%' . $search . '%';
-    }
-
-    if ($categoryId > 0) {
-        $where .= ' AND v.category_id = ?';
-        $params[] = $categoryId;
-    }
-
-    if ($typeId > 0) {
-        $where .= ' AND v.type_id = ?';
-        $params[] = $typeId;
-    }
-
-    if ($minPrice > 0) {
-        $where .= ' AND v.self_drive_price >= ?';
-        $params[] = $minPrice;
-    }
-
-    if ($maxPrice > 0) {
-        $where .= ' AND v.self_drive_price <= ?';
-        $params[] = $maxPrice;
-    }
-
-    $vehicles = db_all(
-        'SELECT v.id, v.company_id, v.category_id, v.type_id, v.name, v.location,
-                v.self_drive_price, v.with_driver_price, v.description, v.status,
-                v.latitude, v.longitude, v.image, v.created_at,
-                COALESCE(NULLIF(u.company_name, ""), u.name) AS company_name, c.name AS category_name, t.name AS type_name,
-                (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE vehicle_id = v.id AND status = "published") AS average_rating,
-                (SELECT COUNT(*) FROM reviews WHERE vehicle_id = v.id AND status = "published") AS review_count
-         FROM vehicles v JOIN users u ON u.id = v.company_id
-         JOIN vehicle_categories c ON c.id = v.category_id
-         JOIN vehicle_types t ON t.id = v.type_id
-         ' . $where . '
-         ORDER BY v.id DESC',
-        $params
-    );
-
-    json_out(true, 'Vehicles loaded.', ['vehicles' => $vehicles]);
 }
 
 if ($action === 'vehicle_save') {
-    $user = api_user_required(['company', 'agent', 'admin', 'super_admin']);
+    $user = api_require_user(['company', 'agent', 'admin', 'super_admin']);
     $id = (int) ($data['vehicle_id'] ?? 0);
     $companyId = managed_company_id($user);
     $categoryId = (int) ($data['category_id'] ?? 0);
@@ -275,7 +176,7 @@ if ($action === 'vehicle_save') {
 }
 
 if ($action === 'vehicle_delete') {
-    $user = api_user_required(['company', 'agent', 'admin', 'super_admin']);
+    $user = api_require_user(['company', 'agent', 'admin', 'super_admin']);
     $id = (int) ($data['vehicle_id'] ?? 0);
     $vehicle = db_one('SELECT * FROM vehicles WHERE id = ? LIMIT 1', [$id]);
 
@@ -289,7 +190,7 @@ if ($action === 'vehicle_delete') {
 }
 
 if ($action === 'booking_decide') {
-    $user = api_user_required(['company', 'agent', 'admin', 'super_admin']);
+    $user = api_require_user(['company', 'agent', 'admin', 'super_admin']);
     $bookingId = (int) ($data['booking_id'] ?? 0);
     $status = $data['status'] ?? '';
 
@@ -310,7 +211,7 @@ if ($action === 'booking_decide') {
 }
 
 if ($action === 'admin_bookings') {
-    $user = api_user_required(['admin', 'super_admin', 'company', 'agent']);
+    $user = api_require_user(['admin', 'super_admin', 'company', 'agent']);
     $status = trim((string) ($_GET['status'] ?? ''));
     $search = trim((string) ($_GET['search'] ?? ''));
     $startDate = trim((string) ($_GET['start_date'] ?? ''));
@@ -374,7 +275,7 @@ if ($action === 'admin_bookings') {
 }
 
 if ($action === 'revenue_summary') {
-    $user = api_user_required(['admin', 'super_admin', 'company', 'agent']);
+    $user = api_require_user(['admin', 'super_admin', 'company', 'agent']);
     $month = (int) ($_GET['month'] ?? date('n'));
     $year = (int) ($_GET['year'] ?? date('Y'));
     $month = $month >= 1 && $month <= 12 ? $month : (int) date('n');
@@ -417,7 +318,7 @@ if ($action === 'revenue_summary') {
 }
 
 if ($action === 'review_submit') {
-    $user = api_user_required(['user']);
+    $user = api_require_user(['user']);
     $bookingId = (int) ($data['booking_id'] ?? 0);
     $rating = (int) ($data['rating'] ?? 0);
     $comment = trim($data['comment'] ?? '');
@@ -456,7 +357,7 @@ if ($action === 'review_submit') {
 }
 
 if ($action === 'site_rating_submit') {
-    $user = api_user_required(['user']);
+    $user = api_require_user(['user']);
     $rating = (int) ($data['rating'] ?? 0);
     $feedback = trim((string) ($data['feedback'] ?? ''));
 
@@ -477,7 +378,7 @@ if ($action === 'site_rating_submit') {
 }
 
 if ($action === 'notifications') {
-    $user = api_user_required();
+    $user = api_require_user();
     json_out(true, 'Notifications loaded.', [
         'unread_count' => NotificationService::unreadCount((int) $user['id']),
         'notifications' => NotificationService::latestForUser((int) $user['id'], 20),
@@ -485,7 +386,7 @@ if ($action === 'notifications') {
 }
 
 if ($action === 'notification_mark_read') {
-    $user = api_user_required();
+    $user = api_require_user();
     $notificationId = (int) ($data['notification_id'] ?? 0);
 
     if ($notificationId > 0) {
