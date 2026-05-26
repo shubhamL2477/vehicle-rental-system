@@ -1,0 +1,86 @@
+.dashboard-layout {
+    grid-template-columns: 260px 1fr;
+    align-items: start;
+}
+
+.dashboard-sidebar {
+    position: sticky;
+    top: 90px;
+}
+
+.dashboard-nav {
+    display: grid;
+    gap: 8px;
+}
+
+.dashboard-nav a {
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: var(--muted);
+}
+
+.dashboard-nav a:hover,
+.dashboard-nav a.is-active {
+    background: #f3e8df;
+    color: var(--text);
+}
+
+.dashboard-content {
+    display: grid;
+    gap: 18px;
+}
+
+.metric-card strong {
+    display: block;
+    font-size: 30px;
+    margin-bottom: 4px;
+}
+
+.stat-card {
+    padding: 14px 16px;
+    min-width: 130px;
+}
+
+.stat-card strong {
+    display: block;
+    font-size: 24px;
+}
+
+.dashboard-image {
+    border-radius: 12px;
+}
+
+.modal[hidden] {
+    display: none;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    z-index: 99;
+}
+
+.modal-card {
+    width: min(600px, 100%);
+    background: white;
+    border-radius: 16px;
+    padding: 22px;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: none;
+    background: #eee7df;
+    cursor: pointer;
+}
+
